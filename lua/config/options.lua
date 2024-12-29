@@ -1,42 +1,66 @@
-local opt = vim.opt
-
 -- 行号
-opt.relativenumber = true
-opt.number = true
+vim.opt.relativenumber = true
+vim.opt.number = true
 
 -- 字体
-opt.guifont="Hack Nerd Font Mono Regular 12"
+vim.opt.guifont="Hack Nerd Font Mono Regular 12"
 
 -- 缩进
-opt.tabstop = 4
-opt.shiftwidth = 4
-opt.expandtab = true
-opt.autoindent = true
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.expandtab = true
+vim.opt.autoindent = true
 
 -- 防止包裹
-opt.wrap = false
+vim.opt.wrap = false
 
 -- 光标行
-opt.cursorline = true
+vim.opt.cursorline = true
 
--- 设置剪贴板使用系统剪贴板
-opt.clipboard:append("unnamedplus")
+-- 配置OSC 52
+-- https://zhuanlan.zhihu.com/p/701934619
+-- 定义OSC52粘贴函数
+local function osc52_paste()
+    -- 获取 "" 寄存器的内容并按行分割
+    local content = vim.fn.getreg("")
+    return vim.split(content, '\n')
+end
+
+-- 检查是否在SSH环境中
+if vim.env.SSH_TTY == nil then
+    -- 本地环境，包括WSL，设置剪贴板使用系统剪贴板
+    vim.opt.clipboard:append("unnamedplus")
+else
+    -- SSH环境，设置剪贴板使用OSC52
+    vim.opt.clipboard:append("unnamedplus")
+    vim.g.clipboard = {
+        name = 'OSC 52',
+        copy = {
+            ['+'] = require('vim.ui.clipboard.osc52').copy('+'),
+            ['*'] = require('vim.ui.clipboard.osc52').copy('*'),
+        },
+        paste = {
+            ["+"] = osc52_paste,
+            ["*"] = osc52_paste,
+        },
+    }
+end
 
 -- 默认新窗口右和下
-opt.splitright = true
-opt.splitbelow = true
+vim.opt.splitright = true
+vim.opt.splitbelow = true
 
 -- 搜索
-opt.ignorecase = true
-opt.smartcase = true
+vim.opt.ignorecase = true
+vim.opt.smartcase = true
 
 -- 外观
-opt.termguicolors = true
-opt.signcolumn = "yes"
+vim.opt.termguicolors = true
+vim.opt.signcolumn = "yes"
 
 -- 主题
 --vim.cmd[[colorscheme tokyonight-night]]
 -- vim.cmd[[colorscheme onedark]]
 
 -- 禁用鼠标
-opt.mouse = ""
+vim.opt.mouse = ""
