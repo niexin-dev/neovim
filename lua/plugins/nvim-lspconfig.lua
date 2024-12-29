@@ -1,6 +1,10 @@
 return {
     {
         "neovim/nvim-lspconfig",
+        keys = {
+            -- 设置查看头/源文件
+            { "<F5>", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
+        },
         config = function()
             local lspconfig = require('lspconfig')
             lspconfig['clangd'].setup(
@@ -8,9 +12,6 @@ return {
                     servers = {
                         -- Ensure mason installs the server
                         clangd = {
-                            keys = {
-                                { "<leader>ch", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
-                            },
                             root_dir = function(fname)
                                 return require("lspconfig.util").root_pattern(
                                     "Makefile",
