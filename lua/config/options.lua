@@ -72,3 +72,6 @@ vim.cmd([[
     autocmd BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g`\"" | endif
   augroup END
 ]])
+
+-- 光标会在第7行触发向上滚动，或者在倒数第7行触发向下滚动
+vim.opt.scrolloff = 7
