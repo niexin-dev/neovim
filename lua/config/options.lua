@@ -64,3 +64,11 @@ vim.opt.signcolumn = "yes"
 
 -- 禁用鼠标
 vim.opt.mouse = ""
+
+-- 打开文件时自动跳转到关闭前的光标位置
+vim.cmd([[
+  augroup restore_cursor_position
+    autocmd!
+    autocmd BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g`\"" | endif
+  augroup END
+]])
