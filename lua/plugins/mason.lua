@@ -1,6 +1,6 @@
 return {
     {
-        "williamboman/mason.nvim", 
+        "williamboman/mason.nvim",
         opts = {
             ui = {
                 icons = {
@@ -12,9 +12,9 @@ return {
         }
     },
     {
-        "williamboman/mason-lspconfig.nvim", 
+        "williamboman/mason-lspconfig.nvim",
         opts = {
-            ensure_installed = {"clangd"},
+            ensure_installed = { "clangd" },
         }
     },
 }
