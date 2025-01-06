@@ -12,8 +12,8 @@ return {
         { "<leader>fr", "<cmd>FzfLua grep_cword<cr>", desc = "Grep word" },
         { "<leader>fs", "<cmd>FzfLua tags<cr>", desc = "Tags" },
         -- git
-        { "<leader>Gc", "<cmd>FzfLua git_commits<CR>", desc = "Commits" },
-        { "<leader>Gs", "<cmd>FzfLua git_status<CR>", desc = "Status" },
+        -- { "<leader>Gc", "<cmd>FzfLua git_commits<CR>", desc = "Commits" },
+        -- { "<leader>Gs", "<cmd>FzfLua git_status<CR>", desc = "Status" },
         -- lsp
         {"<leader>gd", "<cmd>FzfLua lsp_definitions<CR>", desc = "LSP Definitions"},
         {"<leader>gr", "<cmd>FzfLua lsp_references<CR>", desc = "LSP References"},
