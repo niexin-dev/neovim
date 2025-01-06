@@ -46,7 +46,6 @@ return {
                 },
                 format = {
                     enable = true,
-                    style = "file",
                 },
             },
             lua_ls = {},
