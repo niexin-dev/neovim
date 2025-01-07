@@ -35,7 +35,7 @@ return {
             shfmt = {
                 prepend_args = { "-i", "2" },
             },
-            ["clang-format"] = { command = "clang-format", args = { "--style=file:/home/niexin/.config/nvim/.clang-format" } },
+            ["clang-format"] = { command = "clang-format", args = { "--style=file:/home/niexin/.config/nvim/nx-clang-format" }, stdin = true },
         },
     },
     init = function()
