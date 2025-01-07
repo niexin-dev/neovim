@@ -75,3 +75,13 @@ vim.cmd([[
 
 -- 光标会在第7行触发向上滚动，或者在倒数第7行触发向下滚动
 vim.opt.scrolloff = 7
+
+-- 启用持久化的撤销历史
+vim.o.undofile = true
+
+-- 设置 undo 文件的保存目录
+local undodir = vim.fn.stdpath("cache") .. "/undo"
+vim.o.undodir = undodir .. "//"
+
+-- 确保 undo 目录存在
+vim.fn.mkdir(undodir, "p")
