@@ -4,6 +4,10 @@ return {
     priority = 1000,
     config = function()
         -- 设置主题
-        vim.cmd[[colorscheme tokyonight]]
+        -- colorscheme tokyonight-night
+        -- colorscheme tokyonight-storm
+        -- colorscheme tokyonight-day
+        -- colorscheme tokyonight-moon
+        vim.cmd [[colorscheme tokyonight-night]]
     end
 }
