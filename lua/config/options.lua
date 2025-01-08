@@ -3,7 +3,7 @@
 vim.opt.number = true
 
 -- 字体
-vim.opt.guifont="Hack Nerd Font Mono Regular 12"
+vim.opt.guifont = "Hack Nerd Font Mono Regular 12"
 
 -- 缩进
 vim.opt.tabstop = 4
@@ -81,7 +81,13 @@ vim.o.undofile = true
 
 -- 设置 undo 文件的保存目录
 local undodir = vim.fn.stdpath("cache") .. "/undo"
-vim.o.undodir = undodir .. "//"
+vim.opt.undodir = undodir .. "//"
 
 -- 确保 undo 目录存在
 vim.fn.mkdir(undodir, "p")
+
+-- 禁用交换文件
+vim.opt.swapfile = false
+
+-- 设置文件编码格式
+vim.opt.fileencodings = "utf-8,euc-cn,ucs-bom,gb18030,gbk,gb2312,cp936"
