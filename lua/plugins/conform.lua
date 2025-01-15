@@ -22,7 +22,7 @@ return {
             lua = { "stylua" },
             python = { "isort", "black" },
             javascript = { "prettierd", "prettier", stop_after_first = true },
-            c = { "clang-format" },
+            c = { "clang_format" },
         },
         -- Set default options
         default_format_opts = {
@@ -35,7 +35,14 @@ return {
             shfmt = {
                 prepend_args = { "-i", "2" },
             },
-            ["clang-format"] = { command = "clang-format", args = { "--style=file:/home/niexin/.config/nvim/nx-clang-format" }, stdin = true },
+            clang_format = {
+                command = "clang-format",
+                prepend_args = { "--style=file:/home/niexin/.config/nvim/nx-clang-format" },
+                range_args = function(self, ctx)
+                    return { "--lines", string.format("%d:%d", ctx.range.start[1], ctx.range["end"][1]) }
+                end,
+                stdin = true
+            },
         },
     },
     init = function()
