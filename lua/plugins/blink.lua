@@ -40,7 +40,7 @@ return {
         -- 配置自动插入
         completion = {
             list = {
-                selection = 'auto_insert'
+                selection = { preselect = true, auto_insert = true }
             },
         },
     },
