@@ -34,36 +34,16 @@ return {
         statuscolumn = { enabled = true },
         words = { enabled = true },
         lazygit = {},
-        -- terminal增加双击esc退到normal模式
-        terminal = {
-            win = {
-                keys = {
-                    term_normal = {
-                        "<esc><esc>",
-                        function()
-                            return "<C-\\><C-n>"
-                        end,
-                        mode = "t",
-                        expr = true,
-                        desc = "Double escape to normal mode",
-                    },
-                    q = "hide",
-                    ["<esc>"] = "hide",
-                },
-            },
-        },
     },
     init = function()
         vim.g.snacks_animate = false
     end,
     keys = {
         -- 添加lazygit/快捷键
-        { "<leader>lg", "<cmd>lua Snacks.lazygit.open(opts)<CR>",         desc = "Open Lazygit" },
-        { "<leader>ll", "<cmd>lua Snacks.lazygit.log(opts)<CR>",          desc = "Open Lazygit log view" },
-        { "<leader>lf", "<cmd>lua Snacks.lazygit.log(opts)<CR>",          desc = "Open Lazygit log of current file" },
-        -- 添加terminal快捷键
-        { "<F4>",       "<cmd>lua Snacks.terminal.toggle()<CR>", desc = "Open Terminal" },
+        { "<leader>lg", "<cmd>lua Snacks.lazygit.open(opts)<CR>",   desc = "Open Lazygit" },
+        { "<leader>ll", "<cmd>lua Snacks.lazygit.log(opts)<CR>",    desc = "Open Lazygit log view" },
+        { "<leader>lf", "<cmd>lua Snacks.lazygit.log(opts)<CR>",    desc = "Open Lazygit log of current file" },
         -- 添加dashboard快捷键
-        { "<leader>ds", "<cmd>lua Snacks.dashboard.open(opts)<CR>",       desc = "Open dashboard" },
+        { "<leader>ds", "<cmd>lua Snacks.dashboard.open(opts)<CR>", desc = "Open dashboard" },
     }
 }
