@@ -1,5 +1,8 @@
 return {
     'nvim-treesitter/nvim-treesitter',
+    dependencies = {
+        'nvim-treesitter/nvim-treesitter-textobjects', -- 确保安装了textobjects插件
+    },
     lazy = false,
     opts = {
         highlight = { enable = true },
@@ -41,6 +44,15 @@ return {
                 goto_next_end = { ["]F"] = "@function.outer", ["]C"] = "@class.outer", ["]A"] = "@parameter.inner" },
                 goto_previous_start = { ["[f"] = "@function.outer", ["[c"] = "@class.outer", ["[a"] = "@parameter.inner" },
                 goto_previous_end = { ["[F"] = "@function.outer", ["[C"] = "@class.outer", ["[A"] = "@parameter.inner" },
+            },
+            swap = {
+                enable = true,
+                swap_next = {
+                    ["<leader>a"] = "@parameter.inner",
+                },
+                swap_previous = {
+                    ["<leader>A"] = "@parameter.inner",
+                },
             },
         },
     },
