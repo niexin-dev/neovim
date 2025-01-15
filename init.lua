@@ -4,5 +4,3 @@ require("config.options")
 require("config.keymaps")
 -- 配置lazy.nvim，通过lazy.nvim来配置插件
 require("config.lazy")
-
-
