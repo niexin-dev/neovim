@@ -91,3 +91,4 @@ vim.opt.swapfile = false
 
 -- 设置文件编码格式
 vim.opt.fileencodings = "utf-8,euc-cn,ucs-bom,gb18030,gbk,gb2312,cp936"
+

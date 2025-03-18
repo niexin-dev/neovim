@@ -1,18 +1,41 @@
+-- return {
+--     'akinsho/toggleterm.nvim',
+--     version = "*",
+--     opts = {
+--         -- size can be a number or function which is passed the current terminal
+--         size = function(term)
+--             if term.direction == "horizontal" then
+--                 return 30
+--             elseif term.direction == "vertical" then
+--                 return vim.o.columns * 0.4
+--             else
+--                 return 20 -- 默认大小
+--             end
+--         end,
+--         -- 设置触发快捷键
+--         open_mapping = [[<F4>]],
+--     }
+-- }
+
 return {
-    'akinsho/toggleterm.nvim',
+    "akinsho/toggleterm.nvim",
     version = "*",
-    opts = {
-        -- size can be a number or function which is passed the current terminal
-        size = function(term)
-            if term.direction == "horizontal" then
-                return 30
-            elseif term.direction == "vertical" then
-                return vim.o.columns * 0.4
-            else
-                return 20 -- 默认大小
+    keys = { "<F4>" }, -- 推荐设置触发快捷键
+    config = function()
+        local toggleterm = require("toggleterm")
+
+        -- 基础配置
+        toggleterm.setup({
+            size = 20,
+            open_mapping = [[<F4>]], -- 可选打开快捷键
+            on_create = function(term)
+                -- 终端创建时设置键位映射
+                vim.schedule(function()
+                    local opts = { buffer = term.bufnr }
+                    -- 退出终端模式
+                    vim.keymap.set('t', '<esc>', [[<C-\><C-n>]], opts)
+                end)
             end
-        end,
-        -- 设置触发快捷键
-        open_mapping = [[<F4>]],
-    }
+        })
+    end
 }

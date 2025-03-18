@@ -1,15 +1,18 @@
 return {
     'saghen/blink.cmp',
+    dependencies = { "codeium.nvim", "saghen/blink.compat" },
     -- optional: provides snippets for the snippet source
-    dependencies = 'rafamadriz/friendly-snippets',
-
-
+    -- dependencies = {
+    --     'rafamadriz/friendly-snippets',
+    --     "giuxtaposition/blink-cmp-copilot",
+    -- },
     -- use a release tag to download pre-built binaries
-    version = '*',
+    -- version = '*',
     -- AND/OR build from source, requires nightly: https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust
     -- build = 'cargo build --release',
     -- If you use nix, you can build from source using latest nightly rust with:
     -- build = 'nix run .#build-plugin',
+    build = "cargo build --release",
 
     ---@module 'blink.cmp'
     ---@type blink.cmp.Config
@@ -19,7 +22,7 @@ return {
         -- 'enter' for mappings similar to 'super-tab' but with 'enter' to accept
         -- See the full "keymap" documentation for information on defining your own keymap.
         keymap = {
-            preset = 'super-tab',
+            preset = 'default',
         },
 
         appearance = {
@@ -35,7 +38,25 @@ return {
         -- Default list of enabled providers defined so that you can extend it
         -- elsewhere in your config, without redefining it, due to `opts_extend`
         sources = {
-            default = { 'lsp', 'path', 'snippets', 'buffer' },
+            default = { 'lsp', 'path', 'snippets', 'buffer', 'codeium' },
+            -- default = { 'lsp', 'path', 'snippets', 'buffer', 'cmdline', 'copilot' },
+            -- providers = {
+            --     copilot = {
+            --         name = "copilot",
+            --         module = "blink-cmp-copilot",
+            --         score_offset = 100,
+            --         async = true,
+            --     },
+            -- },
+            --
+            providers = {
+                codeium = {
+                    name = "codeium",
+                    module = "blink.compat.source",
+                    score_offset = 100,
+                    async = true,
+                },
+            },
         },
         -- 配置自动插入
         completion = {

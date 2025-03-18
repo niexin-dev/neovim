@@ -10,7 +10,5 @@ vim.keymap.set("v", "J", ":m '>+1<CR>gv=gv")
 vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv")
 
 -- 正常模式
--- 取消高亮
-vim.keymap.set("n", "<leader>nl", ":nohl<CR>")
 
 vim.keymap.set("n", "<leader>rn", ":lua vim.lsp.buf.rename()<CR>")

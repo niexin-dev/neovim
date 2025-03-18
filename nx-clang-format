@@ -67,7 +67,7 @@ BraceWrapping:
   AfterNamespace:  true
   AfterObjCDeclaration: true
   AfterStruct:     true
-  AfterUnion:     true 
+  AfterUnion:      false
   BeforeCatch:     true
   BeforeElse:      true
   BeforeLambdaBody: false
@@ -123,7 +123,7 @@ IncludeIsMainRegex: '(Test)?$'
 IncludeIsMainSourceRegex: ''
 IndentAccessModifiers: false
 IndentCaseBlocks: false
-IndentCaseLabels: false
+IndentCaseLabels: true
 # AfterExternBlock改为NoIndent，extern "C" 后不缩进
 IndentExternBlock: NoIndent
 IndentGotoLabels: true
