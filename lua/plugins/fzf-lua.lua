@@ -22,6 +22,7 @@ return {
         { "<leader>gs", "<cmd>FzfLua lsp_live_workspace_symbols<CR>",               desc = "LSP Symbols" },
         { "<leader>gi", "<cmd>FzfLua lsp_incoming_calls<CR>",                       desc = "LSP Incoming" },
         { "<leader>go", "<cmd>FzfLua lsp_outgoing_calls<CR>",                       desc = "LSP Outgoing" },
+        { "<leader>gx", "<cmd>FzfLua lsp_document_diagnostics<CR>",                 desc = "LSP Diagnostics" },
         { "<leader>qf", "<cmd>FzfLua lsp_code_actions<CR>",                         desc = "LSP Code action" },
 
     },

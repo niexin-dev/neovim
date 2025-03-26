@@ -6,6 +6,8 @@ return {
         "nvim-treesitter/nvim-treesitter",
     },
     opts = {
-        language = "Chinese",
+        opts = {
+            language = "Chinese",
+        },
     },
 }
