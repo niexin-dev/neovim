@@ -13,8 +13,8 @@ return {
         { "<leader>fs", "<cmd>FzfLua tags<cr>",                                     desc = "Tags" },
         { "<leader>fa", "<cmd>FzfLua tags_grep_cword<cr>",                          desc = "Tags word" },
         -- git
-        -- { "<leader>Gc", "<cmd>FzfLua git_commits<CR>", desc = "Commits" },
-        -- { "<leader>Gs", "<cmd>FzfLua git_status<CR>", desc = "Status" },
+        { "<leader>Gc", "<cmd>FzfLua git_commits<CR>",                              desc = "Git Commits" },
+        { "<leader>Gs", "<cmd>FzfLua git_status<CR>",                               desc = "Git Status" },
         -- lsp
         { "<leader>gd", "<cmd>FzfLua lsp_definitions<CR>",                          desc = "LSP Definitions" },
         { "<leader>gr", "<cmd>FzfLua lsp_references<CR>",                           desc = "LSP References" },
