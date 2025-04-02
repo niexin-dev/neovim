@@ -12,3 +12,6 @@ vim.keymap.set("v", "K", ":m '<-2<CR>gv=gv")
 -- 正常模式
 
 vim.keymap.set("n", "<leader>rn", ":lua vim.lsp.buf.rename()<CR>")
+
+-- 在当前目录下创建新文件
+vim.keymap.set("n", "<leader>en", ":new <C-R>=expand(\"%:p:h\") . \"/\" <CR>")
