@@ -17,15 +17,15 @@ return {
                     index = 10,
                     is_default = true,
                     is_slash_cmd = true,
-                    short_name = "commit",
+                    short_name = "nxcmt",
                     auto_submit = true,
                 },
                 prompts = {
                     {
                         role = "user",
                         content = function()
-                            return fmt(
-                                [[You are an expert at following the Conventional Commit specification. Given the git diff listed below, please generate a commit message for me:
+                            return string.format(
+                                [[你是一位精通 Conventional Commit 规范的专家。请根据下方提供的 git diff 内容，为我生成符合规范的中文提交信息：
 
 ```diff
 %s
@@ -41,6 +41,18 @@ return {
                 },
             },
 
+        },
+    },
+    keys = {
+        {
+            "<leader>dm", -- 你可以自定义快捷键
+            function()
+                require("codecompanion").prompt("nxcmt")
+            end,
+            desc = "Generate commit message",
+            mode = "n",
+            noremap = true,
+            silent = true,
         },
     },
 }
