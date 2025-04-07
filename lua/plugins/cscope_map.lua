@@ -13,10 +13,10 @@ return {
     --     })
     -- end,
     opts = {
-        skip_input_prompt = true,             -- "true" doesn't ask for input
+        skip_input_prompt = true, -- "true" doesn't ask for input
         cscope = {
-            picker = "fzf-lua"
-        }
-
+            picker = "fzf-lua",
+            db_build_cmd = { script = "default", args = { "-bqR" } },
+        },
     }
 }
