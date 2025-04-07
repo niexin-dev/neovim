@@ -92,3 +92,7 @@ vim.opt.swapfile = false
 -- 设置文件编码格式
 vim.opt.fileencodings = "utf-8,euc-cn,ucs-bom,gb18030,gbk,gb2312,cp936"
 
+vim.wo.wrap = true          -- 启用换行
+vim.wo.linebreak = true     -- 在单词边界换行（避免截断单词）
+vim.wo.breakindent = true   -- 保持缩进
+vim.wo.showbreak = '↪ '     -- 折行显示前缀符号（可选）
