@@ -1,49 +1,65 @@
+-- 返回一个Lua表，描述插件配置（符合lazy.nvim规范）
 return {
+    -- 插件GitHub仓库地址
     "olimorris/codecompanion.nvim",
+    -- 自动加载默认配置
     config = true,
+    -- 声明依赖的其他插件
     dependencies = {
-        "nvim-lua/plenary.nvim",
-        "nvim-treesitter/nvim-treesitter",
+        "nvim-lua/plenary.nvim",           -- 提供Lua工具函数
+        "nvim-treesitter/nvim-treesitter", -- 语法分析
     },
+    -- 自定义配置选项
     opts = {
+        -- 全局选项
         opts = {
-            language = "Chinese",
+            language = "Chinese", -- 设置默认语言为中文
         },
+        -- 定义不同策略使用的适配器
         strategies = {
-            chat = {
+            chat = {                  -- 聊天模式
+                adapter = "deepseek", -- 使用deepseek适配器
+            },
+            inline = {                -- 行内编辑模式
                 adapter = "deepseek",
             },
-            inline = {
-                adapter = "deepseek",
-            },
-            cmd = {
+            cmd = { -- 命令行模式
                 adapter = "deepseek",
             }
         },
+        -- 适配器具体配置
         adapters = {
-            deepseek = function()
+            deepseek = function() -- deepseek适配器定义
                 return require("codecompanion.adapters").extend("deepseek", {
                     env = {
-                        api_key = "REDACTED",
+                        api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                    },
+                    schema = {
+                        model = {
+                            default = "deepseek-chat" -- 默认模型
+                        }
                     },
                 })
             end,
         },
+        -- 预定义提示库
         prompt_library = {
+            -- 名为"Generate a Commit Message"的提示
             ["Generate a Commit Message"] = {
-                strategy = "chat",
-                description = "Generate a commit message",
+                strategy = "chat",                         -- 使用聊天策略
+                description = "Generate a commit message", -- 描述
                 opts = {
-                    index = 10,
-                    is_default = true,
-                    is_slash_cmd = true,
-                    short_name = "nxcmt",
-                    auto_submit = true,
+                    index = 10,                            -- 排序位置
+                    is_default = true,                     -- 设为默认提示
+                    is_slash_cmd = true,                   -- 支持斜杠命令
+                    short_name = "nxcmt",                  -- 快捷名称
+                    auto_submit = true,                    -- 自动提交
                 },
+                -- 提示内容定义
                 prompts = {
                     {
-                        role = "user",
-                        content = function()
+                        role = "user",       -- 用户角色
+                        content = function() -- 动态生成内容
                             return string.format(
                                 [[你是一位精通 Conventional Commit 规范的专家。请根据下方提供的 git diff 内容，为我生成符合规范的中文提交信息：
 
@@ -51,28 +67,28 @@ return {
 %s
 ```
 ]],
-                                vim.fn.system("git diff --no-ext-diff --staged")
+                                vim.fn.system("git diff --no-ext-diff --staged") -- 获取暂存区diff
                             )
                         end,
                         opts = {
-                            contains_code = true,
+                            contains_code = true, -- 标记包含代码
                         },
                     },
                 },
             },
-
         },
     },
+    -- 快捷键绑定
     keys = {
         {
-            "<leader>dm", -- 你可以自定义快捷键
-            function()
-                require("codecompanion").prompt("nxcmt")
+            "<leader>dm",                                -- 快捷键组合
+            function()                                   -- 执行函数
+                require("codecompanion").prompt("nxcmt") -- 触发nxcmt提示
             end,
-            desc = "Generate commit message",
-            mode = "n",
-            noremap = true,
-            silent = true,
+            desc = "Generate commit message",            -- 描述
+            mode = "n",                                  -- 普通模式生效
+            noremap = true,                              -- 非递归映射
+            silent = true,                               -- 静默执行
         },
     },
 }
