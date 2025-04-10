@@ -9,6 +9,26 @@ return {
         opts = {
             language = "Chinese",
         },
+        strategies = {
+            chat = {
+                adapter = "deepseek",
+            },
+            inline = {
+                adapter = "deepseek",
+            },
+            cmd = {
+                adapter = "deepseek",
+            }
+        },
+        adapters = {
+            deepseek = function()
+                return require("codecompanion.adapters").extend("deepseek", {
+                    env = {
+                        api_key = "REDACTED",
+                    },
+                })
+            end,
+        },
         prompt_library = {
             ["Generate a Commit Message"] = {
                 strategy = "chat",
