@@ -30,7 +30,8 @@ return {
         files = {
             git_icons = false,
             find_opts = "-type f -not -path '*/\\.git/*' -printf '%P\n'",
-            fd_opts = "--color=never --type f --hidden --follow --exclude .git",
+            fd_opts   = "--color=never --type f --hidden --follow --exclude .git",
+            winopts   = { preview = { winopts = { cursorline = true } } },
         },
         winopts = {
             -- split = "belowright 10new",
