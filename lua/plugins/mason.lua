@@ -12,9 +12,16 @@ return {
         }
     },
     {
+        -- ✓ bash-language-server bashls
+        -- ✓ clang-format
+        -- ✓ clangd
+        -- ✓ lua-language-server lua_ls
+        -- ✓ shellcheck
+        -- ✓ shfmt
+
         "williamboman/mason-lspconfig.nvim",
         opts = {
-            ensure_installed = { "clangd" },
+            ensure_installed = { "clangd", "bashls", "lua_ls" },
         }
     },
 }

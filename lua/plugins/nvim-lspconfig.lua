@@ -50,6 +50,7 @@ return {
                 },
             },
             lua_ls = {},
+            bashls = {},
         }
     },
 
