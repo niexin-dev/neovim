@@ -12,7 +12,7 @@ return {
             clangd = {
                 on_attach = function()
                     vim.lsp.inlay_hint.enable(true)
-                    vim.diagnostic.config({ virtual_text = true })
+                    -- vim.diagnostic.config({ virtual_text = true })
                 end,
                 -- Ensure mason installs the server
                 root_dir = function(fname)
