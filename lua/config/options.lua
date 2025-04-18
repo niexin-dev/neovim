@@ -97,4 +97,29 @@ vim.wo.linebreak = true -- 在单词边界换行（避免截断单词）
 vim.wo.breakindent = true -- 保持缩进
 vim.wo.showbreak = '↪ ' -- 折行显示前缀符号（可选）
 
+-- 添加错误处理
 -- vim.diagnostic.config({ virtual_lines = true })
+
+-- 设置wsl剪切板
+local function setup_clipboard()
+    if vim.fn.has('wsl') == 1 then
+        vim.g.clipboard = {
+            name = 'WslClipboard',
+            copy = {
+                ['+'] = 'clip.exe',
+                ['*'] = 'clip.exe',
+            },
+            paste = {
+                ['+'] =
+                'powershell.exe -NoLogo -NoProfile -c [Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))',
+                ['*'] =
+                'powershell.exe -NoLogo -NoProfile -c [Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))',
+            },
+            cache_enabled = 0,
+        }
+
+        vim.notify("WSL clipboard configured", vim.log.levels.INFO)
+    end
+end
+
+setup_clipboard()
