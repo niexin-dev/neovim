@@ -32,6 +32,7 @@ return {
             find_opts = "-type f -not -path '*/\\.git/*' -printf '%P\n'",
             fd_opts   = "--color=never --type f --hidden --follow --exclude .git",
             winopts   = { preview = { winopts = { cursorline = true } } },
+            no_ignore = false,
         },
         winopts = {
             -- split = "belowright 10new",
