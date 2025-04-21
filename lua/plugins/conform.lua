@@ -17,12 +17,16 @@ return {
     ---@module "conform"
     ---@type conform.setupOpts
     opts = {
+        -- Set the log level. Use `:ConformInfo` to see the location of the log file.
+        -- log_level = vim.log.levels.DEBUG,
         -- Define your formatters
         formatters_by_ft = {
             lua = { "stylua" },
             python = { "isort", "black" },
             javascript = { "prettierd", "prettier", stop_after_first = true },
             c = { "clang_format" },
+            cpp = { "clang_format" },
+
         },
         -- Set default options
         default_format_opts = {
