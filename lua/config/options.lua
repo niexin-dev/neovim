@@ -118,7 +118,7 @@ local function setup_clipboard()
             cache_enabled = 0,
         }
 
-        vim.notify("WSL clipboard configured", vim.log.levels.INFO)
+        -- vim.notify("WSL clipboard configured", vim.log.levels.INFO)
     end
 end
 
