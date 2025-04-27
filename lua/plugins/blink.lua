@@ -56,6 +56,12 @@ return {
                     score_offset = 100,
                     async = true,
                 },
+                cmdline = {
+                    -- ignores cmdline completions when executing shell commands
+                    enabled = function()
+                        return vim.fn.getcmdtype() ~= ':' or not vim.fn.getcmdline():match("^[%%0-9,'<>%-]*!")
+                    end
+                },
             },
         },
         -- 配置自动插入
