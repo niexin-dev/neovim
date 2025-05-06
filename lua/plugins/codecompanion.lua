@@ -15,17 +15,18 @@ return {
         -- 全局选项
         opts = {
             language = "Chinese", -- 设置默认语言为中文
+            -- log_level = "TRACE",  -- TRACE|DEBUG|ERROR|INFO
         },
         -- 定义不同策略使用的适配器
         strategies = {
-            chat = {                  -- 聊天模式
-                adapter = "deepseek", -- 使用deepseek适配器
+            chat = {                -- 聊天模式
+                adapter = "gemini", -- 使用deepseek适配器
             },
-            inline = {                -- 行内编辑模式
-                adapter = "deepseek",
+            inline = {              -- 行内编辑模式
+                adapter = "gemini",
             },
             cmd = { -- 命令行模式
-                adapter = "deepseek",
+                adapter = "gemini",
             }
         },
         -- 适配器具体配置
@@ -42,6 +43,18 @@ return {
                     },
                 })
             end,
+            gemini = function()
+                return require("codecompanion.adapters").extend("gemini", {
+                    env = {
+                        api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                    },
+                    schema = {
+                        model = {
+                            default = "gemini-2.0-flash-exp" -- 默认模型
+                        }
+                    },
+                })
+            end
         },
         -- 预定义提示库
         prompt_library = {
