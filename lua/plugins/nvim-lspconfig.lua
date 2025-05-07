@@ -1,6 +1,8 @@
 return {
     "neovim/nvim-lspconfig",
 
+    lazy = false,
+
     keys = {
         -- 设置查看头/源文件
         { "<F5>", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
