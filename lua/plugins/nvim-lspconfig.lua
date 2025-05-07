@@ -8,61 +8,22 @@ return {
         { "<F5>", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
     },
 
-    -- example using `opts` for defining servers
-    opts = {
-        servers = {
-            clangd = {
-                on_attach = function()
-                    vim.lsp.inlay_hint.enable(true)
-                    -- vim.diagnostic.config({ virtual_text = true })
-                end,
-                -- Ensure mason installs the server
-                root_dir = function(fname)
-                    return require("lspconfig.util").root_pattern(
-                        "Makefile",
-                        "configure.ac",
-                        "configure.in",
-                        "config.h.in",
-                        "meson.build",
-                        "meson_options.txt",
-                        "build.ninja"
-                    )(fname) or require("lspconfig.util").root_pattern("compile_commands.json", "compile_flags.txt")(
-                        fname
-                    ) or require("lspconfig.util").find_git_ancestor(fname)
-                end,
-                capabilities = {
-                    offsetEncoding = { "utf-16" },
-                },
-                cmd = {
-                    "clangd",
-                    "--background-index",
-                    "--clang-tidy",
-                    "--header-insertion=iwyu",
-                    "--completion-style=detailed",
-                    "--function-arg-placeholders",
-                    "--fallback-style=Microsoft",
-                },
-                init_options = {
-                    usePlaceholders = true,
-                    completeUnimported = true,
-                    clangdFileStatus = true,
-                },
-                format = {
-                    enable = true,
-                },
+    config = function()
+        vim.lsp.config('*', {
+            capabilities = {
+                textDocument = {
+                    semanticTokens = {
+                        multilineTokenSupport = true,
+                    }
+                }
             },
-            lua_ls = {},
-            bashls = {},
+            root_markers = { '.git' },
+        })
+        vim.lsp.config['clangd'] = {
+            cmd = { 'clangd' },
+            root_markers = { 'compile_commands.json', '.git' },
+            vim.lsp.inlay_hint.enable(true)
         }
-    },
-
-    config = function(_, opts)
-        local lspconfig = require('lspconfig')
-        for server, config in pairs(opts.servers) do
-            -- passing config.capabilities to blink.cmp merges with the capabilities in your
-            -- `opts[server].capabilities, if you've defined it
-            config.capabilities = require('blink.cmp').get_lsp_capabilities(config.capabilities)
-            lspconfig[server].setup(config)
-        end
+        vim.lsp.enable('clangd')
     end
 }
