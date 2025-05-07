@@ -41,7 +41,7 @@ return {
             },
             clang_format = {
                 command = "clang-format",
-                prepend_args = { "--style=file:/home/niexin/.config/nvim/nx-clang-format" },
+                prepend_args = { "--style=file:" .. vim.fs.joinpath(vim.fn.stdpath("config"), "nx-clang-format") },
                 range_args = function(self, ctx)
                     return { "--lines", string.format("%d:%d", ctx.range.start[1], ctx.range["end"][1]) }
                 end,
