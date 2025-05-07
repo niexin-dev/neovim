@@ -20,14 +20,13 @@
 return {
     "akinsho/toggleterm.nvim",
     version = "*",
-    keys = { "<F4>" }, -- 推荐设置触发快捷键
     config = function()
         local toggleterm = require("toggleterm")
 
         -- 基础配置
         toggleterm.setup({
             size = 20,
-            open_mapping = [[<F4>]], -- 可选打开快捷键
+            open_mapping = [[<leader>tt]], -- 可选打开快捷键
             on_create = function(term)
                 -- 终端创建时设置键位映射
                 vim.schedule(function()
