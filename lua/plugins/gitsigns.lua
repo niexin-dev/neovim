@@ -55,7 +55,6 @@ return {
         on_attach                    = function()
             vim.api.nvim_set_keymap("n", "<leader>gj", "<cmd>Gitsigns next_hunk<CR>", { silent = true, noremap = true })
             vim.api.nvim_set_keymap("n", "<leader>gk", "<Cmd>Gitsigns prev_hhunk<CR>", { silent = true, noremap = true })
-            vim.api.nvim_set_keymap("n", "<leader>gb", "<Cmd>Gitsigns blame<CR>", { silent = true, noremap = true })
             vim.api.nvim_set_keymap('n', '<leader>hs', ':Gitsigns stage_hunk<CR>', { silent = true, noremap = true })
             vim.api.nvim_set_keymap('v', '<leader>hs', ':Gitsigns stage_hunk<CR>', { silent = true, noremap = true })
             vim.api.nvim_set_keymap('n', '<leader>hr', ':Gitsigns reset_hunk<CR>', { silent = true, noremap = true })
