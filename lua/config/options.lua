@@ -73,8 +73,8 @@ vim.cmd([[
   augroup END
 ]])
 
--- 光标会在第7行触发向上滚动，或者在倒数第7行触发向下滚动
-vim.opt.scrolloff = 7
+-- 光标会在第10行触发向上滚动，或者在倒数第10行触发向下滚动
+vim.opt.scrolloff = math.min(10, math.floor(vim.o.lines * 0.3)) -- 不超过窗口高度的30%
 
 -- 启用持久化的撤销历史
 vim.o.undofile = true
