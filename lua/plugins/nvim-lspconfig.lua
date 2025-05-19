@@ -5,7 +5,7 @@ return {
 
     keys = {
         -- 设置查看头/源文件
-        { "<leader>gh", "<cmd>ClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
+        { "<leader>gh", "<cmd>LspClangdSwitchSourceHeader<cr>", desc = "Switch Source/Header (C/C++)" },
     },
 
     config = function()
