@@ -26,6 +26,7 @@ return {
             root_markers = { 'compile_commands.json', '.git' },
             vim.lsp.inlay_hint.enable(true)
         }
-        vim.lsp.enable('clangd')
+        -- mason-lspconfig会自动使能对应的lsp
+        -- vim.lsp.enable('clangd')
     end
 }
