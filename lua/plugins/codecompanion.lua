@@ -10,6 +10,7 @@ return {
         "nvim-treesitter/nvim-treesitter", -- 语法分析
     },
     lazy = false,
+    version = "*",
     -- 自定义配置选项
     opts = {
         -- 全局选项
