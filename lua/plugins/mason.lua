@@ -27,6 +27,7 @@ return {
                 "clangd",
                 "lua_ls", -- nvim-lspconfig 中 lua-language-server 的名称是 lua_ls
                 "marksman",
+                "taplo",  -- 这会安装 taplo CLI 工具和 LSP 服务器"
             },
         }
     }

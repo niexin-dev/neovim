@@ -27,6 +27,8 @@ return {
             c = { "clang_format" },
             cpp = { "clang_format" },
             markdown = { "prettier" },
+            json = { "prettier" },
+            toml = { "taplo" },
 
         },
         -- Set default options
