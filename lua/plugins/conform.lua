@@ -26,6 +26,7 @@ return {
             javascript = { "prettierd", "prettier", stop_after_first = true },
             c = { "clang_format" },
             cpp = { "clang_format" },
+            markdown = { "prettier" },
 
         },
         -- Set default options

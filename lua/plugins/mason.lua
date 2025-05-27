@@ -9,19 +9,25 @@ return {
                     package_uninstalled = "✗",
                 },
             },
+            -- 将非 LSP 的工具放在这里，让 Mason 来安装它们
+            ensure_installed = {
+                "clang-format", -- 格式化工具
+                "prettier",     -- 格式化工具
+                "shellcheck",   -- linter 工具
+                "shfmt",        -- 格式化工具
+            },
         }
     },
     {
-        -- ✓ bash-language-server bashls
-        -- ✓ clang-format
-        -- ✓ clangd
-        -- ✓ lua-language-server lua_ls
-        -- ✓ shellcheck
-        -- ✓ shfmt
-
         "williamboman/mason-lspconfig.nvim",
         opts = {
-            ensure_installed = { "clangd", "bashls", "lua_ls" },
+            -- 这里只放 nvim-lspconfig 支持的 LSP 服务器名称
+            ensure_installed = {
+                "bashls", -- nvim-lspconfig 中 bash-language-server 的名称是 bashls
+                "clangd",
+                "lua_ls", -- nvim-lspconfig 中 lua-language-server 的名称是 lua_ls
+                "marksman",
+            },
         }
-    },
+    }
 }
