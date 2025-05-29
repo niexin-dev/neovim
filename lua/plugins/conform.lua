@@ -7,7 +7,8 @@ return {
             -- Customize or remove this keymap to your liking
             "<leader>df",
             function()
-                require("conform").format({ async = true })
+                require("conform").format({ async = true, lsp_format = "fallback" })
+                vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<esc>', true, false, true), 'n', false)
             end,
             mode = "",
             desc = "Format buffer",
