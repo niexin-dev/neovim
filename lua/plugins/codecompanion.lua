@@ -105,5 +105,6 @@ return {
             noremap = true,                              -- 非递归映射
             silent = true,                               -- 静默执行
         },
+        { "<leader>di", "<cmd>CodeCompanionChat<cr>", desc = "CodeCompanionChat" },
     },
 }
