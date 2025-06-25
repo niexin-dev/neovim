@@ -51,7 +51,7 @@ return {
                     },
                     schema = {
                         model = {
-                            default = "gemini-2.0-flash-exp" -- 默认模型
+                            default = "gemini-2.5-flash-preview-05-20" -- 默认模型
                         }
                     },
                 })
