@@ -1,6 +1,7 @@
 return {
     'nvim-treesitter/nvim-treesitter',
     dependencies = {
+        'OXY2DEV/markview.nvim',
         'nvim-treesitter/nvim-treesitter-textobjects', -- 确保安装了textobjects插件
     },
     lazy = false,
