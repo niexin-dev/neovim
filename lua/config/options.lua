@@ -103,21 +103,24 @@ vim.wo.showbreak = '↪ ' -- 折行显示前缀符号（可选）
 -- 设置wsl剪切板
 local function setup_clipboard()
     if vim.fn.has('wsl') == 1 then
+        -- 配置 Neovim 使用 win32yank
+        -- https://github.com/equalsraf/win32yank/releases
+        -- # 假设你把 win32yank.exe 下载到了 Windows 的 Downloads 文件夹
+        -- # 请根据你的实际路径调整 /mnt/c/Users/YourUser/Downloads/
+        -- sudo cp /mnt/c/Users/YourUser/Downloads/win32yank.exe /usr/local/bin/
+        -- sudo chmod +x /usr/local/bin/win32yank.exe
         vim.g.clipboard = {
-            name = 'WslClipboard',
+            name = 'win32yank-wsl',
             copy = {
-                ['+'] = 'clip.exe',
-                ['*'] = 'clip.exe',
+                ['+'] = 'win32yank.exe -i --crlf',
+                ['*'] = 'win32yank.exe -i --crlf',
             },
             paste = {
-                ['+'] =
-                'powershell.exe -NoLogo -NoProfile -c [Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))',
-                ['*'] =
-                'powershell.exe -NoLogo -NoProfile -c [Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))',
+                ['+'] = 'win32yank.exe -o --lf',
+                ['*'] = 'win32yank.exe -o --lf',
             },
-            cache_enabled = 0,
+            cache_enabled = true, -- 启用缓存可以提升性能
         }
-
         -- vim.notify("WSL clipboard configured", vim.log.levels.INFO)
     end
 end
