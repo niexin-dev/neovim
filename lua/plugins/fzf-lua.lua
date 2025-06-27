@@ -8,11 +8,9 @@ return {
         { "<leader>fl", "<cmd>FzfLua blines<cr>",                                   desc = "Lines" },
         { "<leader>ft", "<cmd>FzfLua treesitter<cr>",                               desc = "Treesitter" },
         -- search
-        { "<leader>fw", "<cmd>FzfLua live_grep<cr>",                                     desc = "Grep" },
+        { "<leader>fs", "<cmd>FzfLua live_grep<cr>",                                desc = "Grep" },
         { "<leader>fr", "<cmd>FzfLua grep_cword<cr>",                               desc = "Grep word" },
-        { "<leader>fs", "<cmd>FzfLua tags<cr>",                                     desc = "Tags" },
-        { "<leader>fa", "<cmd>FzfLua tags_grep_cword<cr>",                          desc = "Tags word" },
-        { "<leader>fj", "<cmd>FzfLua resume<cr>",                                   desc = "Resuse" },
+        { "<leader>fa", "<cmd>FzfLua resume<cr>",                                   desc = "Resuse" },
         -- git
         { "<leader>Gc", "<cmd>FzfLua git_commits<CR>",                              desc = "Git Commits" },
         { "<leader>Gs", "<cmd>FzfLua git_status<CR>",                               desc = "Git Status" },
