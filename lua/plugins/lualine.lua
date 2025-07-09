@@ -27,7 +27,31 @@ return {
                     return require("nvim-treesitter").statusline({
                         indicator_size = 100,
                         type_patterns = { 'class', 'function', 'method' },
-                        transform_fn = function(line, _node) return line:gsub('%s*[%[%(%{]*%s*$', '') end,
+                        transform_fn = function(line, node)
+                            local node_type = node:type()
+
+                            -- 检查节点类型，如果是存储类别指示符、类型指示符或基本类型等，则返回空字符串，不包含在状态行中
+                            if node_type == 'storage_class_specifier' or
+                                node_type == 'type_specifier' or
+                                node_type == 'primitive_type' or
+                                node_type == 'struct_specifier' then
+                                return ""
+                            end
+
+                            -- 从行中提取函数名：
+                            -- 1. 匹配到第一个开括号 '(' 之前的所有内容
+                            local before_params = line:match('^(.-)%s*%(')
+                            if not before_params then
+                                -- 如果没有括号，就取整行内容
+                                before_params = line
+                            end
+
+                            -- 2. 从“类型 函数名”部分中提取最后一个单词（即函数名）
+                            local func_name = before_params:match('[%w_]+$')
+
+                            return func_name or ""
+                        end,
+
                         separator = ' -> ',
                         allow_duplicates = false
                     })
