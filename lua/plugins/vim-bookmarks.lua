@@ -6,6 +6,7 @@ return {
         vim.g.bookmark_sign = '⚑'
         vim.g.bookmark_highlight_group = 'BookmarkLine'
         vim.g.bookmark_highlight_lines = 1
+        vim.g.bookmark_auto_save = 0
         vim.opt.termguicolors = true
         vim.api.nvim_set_hl(0, 'BookmarkLine', {
             -- 对于真彩色终端 (termguicolors 开启时):
