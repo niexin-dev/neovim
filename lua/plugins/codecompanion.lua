@@ -55,6 +55,19 @@ return {
                         }
                     },
                 })
+            end,
+            openai = function()
+                return require("codecompanion.adapters").extend("openai", {
+                    env = {
+                        api_key =
+                        "REDACTED",           -- API密钥（建议改用环境变量）
+                    },
+                    schema = {
+                        model = {
+                            default = "gpt-4o" -- 默认模型
+                        }
+                    },
+                })
             end
         },
         -- 预定义提示库
