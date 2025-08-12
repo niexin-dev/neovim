@@ -41,6 +41,14 @@ return {
                 vertical = "up:50%",   -- up|down:size
                 -- hidden = "hidden", -- 隐藏预览窗口
             },
+            -- fzf-lua 的 ui_select 配置（可选）
+            -- ui_select = { silent = true },
         }, -- UI Options
     },
+    config = function(_, opts)
+        local fzf = require("fzf-lua")
+        fzf.setup(opts)
+        -- 🔹 自动注册成 vim.ui.select 后端
+        fzf.register_ui_select()
+    end,
 }
