@@ -60,7 +60,7 @@ return {
                 return require("codecompanion.adapters").extend("openai", {
                     env = {
                         api_key =
-                        "REDACTED",           -- API密钥（建议改用环境变量）
+                        "REDACTED", -- API密钥（建议改用环境变量）
                     },
                     schema = {
                         model = {
@@ -90,7 +90,6 @@ return {
                         content = function() -- 动态生成内容
                             return string.format(
                                 [[
-```markdown
 你是一位精通 Conventional Commits 的软件工程师和代码分析专家。请基于下方提供的 git diff，生成一份符合规范的中文 Git 提交信息。
 
 输出必须包含：提交头（Header）、正文（Body）、脚注（Footer 可选）。严格遵循以下结构与规则，不要输出任何思考过程或解释。
@@ -134,7 +133,8 @@ git diff:
 - 风险识别：若出现接口签名/默认值/配置键/协议格式/数据模式/版本约束的破坏性变更，必须给出 BREAKING CHANGE 与迁移提示
 - 不确定项：无法从 diff 明确判断时，使用“无明显变化/不影响对外接口/风险有限”等客观表述补齐
 - 关键变更点：使用“• ”作为每条要点前缀，3–6 条为宜
-```
+
+---
 ]],
                                 vim.fn.system("git diff --no-ext-diff --staged") -- 获取暂存区diff
                             )
