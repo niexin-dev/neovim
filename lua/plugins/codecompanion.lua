@@ -32,43 +32,45 @@ return {
         },
         -- 适配器具体配置
         adapters = {
-            deepseek = function() -- deepseek适配器定义
-                return require("codecompanion.adapters").extend("deepseek", {
-                    env = {
-                        api_key = "REDACTED", -- API密钥（建议改用环境变量）
-                    },
-                    schema = {
-                        model = {
-                            default = "deepseek-chat" -- 默认模型
-                        }
-                    },
-                })
-            end,
-            gemini = function()
-                return require("codecompanion.adapters").extend("gemini", {
-                    env = {
-                        api_key = "REDACTED", -- API密钥（建议改用环境变量）
-                    },
-                    schema = {
-                        model = {
-                            default = "gemini-2.5-flash-preview-05-20" -- 默认模型
-                        }
-                    },
-                })
-            end,
-            openai = function()
-                return require("codecompanion.adapters").extend("openai", {
-                    env = {
-                        api_key =
-                        "REDACTED", -- API密钥（建议改用环境变量）
-                    },
-                    schema = {
-                        model = {
-                            default = "gpt-4o" -- 默认模型
-                        }
-                    },
-                })
-            end
+            http = {
+                deepseek = function() -- deepseek适配器定义
+                    return require("codecompanion.adapters").extend("deepseek", {
+                        env = {
+                            api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                        },
+                        schema = {
+                            model = {
+                                default = "deepseek-chat" -- 默认模型
+                            }
+                        },
+                    })
+                end,
+                gemini = function()
+                    return require("codecompanion.adapters").extend("gemini", {
+                        env = {
+                            api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                        },
+                        schema = {
+                            model = {
+                                default = "gemini-2.5-flash-preview-05-20" -- 默认模型
+                            }
+                        },
+                    })
+                end,
+                openai = function()
+                    return require("codecompanion.adapters").extend("openai", {
+                        env = {
+                            api_key =
+                            "REDACTED", -- API密钥（建议改用环境变量）
+                        },
+                        schema = {
+                            model = {
+                                default = "gpt-4o" -- 默认模型
+                            }
+                        },
+                    })
+                end
+            },
         },
         -- 预定义提示库
         prompt_library = {
