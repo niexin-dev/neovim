@@ -1,6 +1,7 @@
 return {
     {
         "williamboman/mason.nvim",
+        cmd = { "Mason", "MasonInstall", "MasonUpdate" },
         opts = {
             ui = {
                 icons = {
@@ -20,6 +21,7 @@ return {
     },
     {
         "williamboman/mason-lspconfig.nvim",
+        event = "VeryLazy",
         opts = {
             -- 这里只放 nvim-lspconfig 支持的 LSP 服务器名称
             ensure_installed = {

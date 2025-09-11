@@ -1,5 +1,7 @@
 return {
     "dhananjaylatkar/cscope_maps.nvim",
+    event = { "BufReadPost", "BufNewFile" },
+
     dependencies = {
         "ibhagwan/fzf-lua", -- optional [for picker="fzf-lua"]
         "nvim-lua/plenary.nvim"

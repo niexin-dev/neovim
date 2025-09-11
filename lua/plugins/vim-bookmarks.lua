@@ -1,7 +1,7 @@
 return {
     'MattesGroeger/vim-bookmarks',
     name = 'bookmarks',
-    lazy = false,
+    cmd = { "BookmarkToggle", "BookmarkAnnotate", "BookmarkShowAll", "BookmarkClearAll" },
     config = function()
         vim.g.bookmark_sign = '⚑'
         vim.g.bookmark_highlight_group = 'BookmarkLine'

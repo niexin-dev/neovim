@@ -1,7 +1,7 @@
 return {
     "neovim/nvim-lspconfig",
 
-    lazy = false,
+    event = "VeryLazy",
 
     keys = {
         -- 设置查看头/源文件

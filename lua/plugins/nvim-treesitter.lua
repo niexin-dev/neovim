@@ -4,7 +4,8 @@ return {
         'OXY2DEV/markview.nvim',
         'nvim-treesitter/nvim-treesitter-textobjects', -- 确保安装了textobjects插件
     },
-    lazy = false,
+    event = { "BufReadPost", "BufNewFile" },
+    build = ":TSUpdate",
     opts = {
         highlight = { enable = true },
         indent = { enable = true },

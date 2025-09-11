@@ -1,5 +1,6 @@
 return {
     "nvim-treesitter/nvim-treesitter-context",
+    event = "VeryLazy",
     opts = {
         -- Enable this plugin (Can be enabled/disabled later via commands)
         enable = true,

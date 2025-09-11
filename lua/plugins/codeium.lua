@@ -3,6 +3,7 @@ return {
     dependencies = {
         "nvim-lua/plenary.nvim",
     },
+    event = { "BufReadPost", "InsertEnter" },
     config = function()
         require("codeium").setup({
         })

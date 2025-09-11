@@ -9,7 +9,7 @@ return {
         "nvim-lua/plenary.nvim",           -- 提供Lua工具函数
         "nvim-treesitter/nvim-treesitter", -- 语法分析
     },
-    lazy = false,
+    
     version = "*",
     -- 自定义配置选项
     opts = {
