@@ -36,7 +36,7 @@ return {
                 deepseek = function() -- deepseek适配器定义
                     return require("codecompanion.adapters").extend("deepseek", {
                         env = {
-                            api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                            api_key = "cmd:echo $DEEPSEEK_API_KEY", -- 从环境变量读取
                         },
                         schema = {
                             model = {
@@ -48,11 +48,11 @@ return {
                 gemini = function()
                     return require("codecompanion.adapters").extend("gemini", {
                         env = {
-                            api_key = "REDACTED", -- API密钥（建议改用环境变量）
+                            api_key = "cmd:echo $GEMINI_API_KEY", -- 从环境变量读取
                         },
                         schema = {
                             model = {
-                                default = "gemini-2.5-flash-preview-05-20" -- 默认模型
+                                default = "gemini-2.5-flash" -- 更新的模型
                             }
                         },
                     })
@@ -60,8 +60,7 @@ return {
                 openai = function()
                     return require("codecompanion.adapters").extend("openai", {
                         env = {
-                            api_key =
-                            "REDACTED", -- API密钥（建议改用环境变量）
+                            api_key = "cmd:echo $OPENAI_API_KEY", -- 从环境变量读取
                         },
                         schema = {
                             model = {
@@ -74,6 +73,91 @@ return {
         },
         -- 预定义提示库
         prompt_library = {
+            -- 代码解释
+            ["Explain Code"] = {
+                strategy = "chat",
+                description = "解释选中的代码",
+                opts = {
+                    index = 1,
+                    is_slash_cmd = true,
+                    short_name = "explain",
+                },
+                prompts = {
+                    {
+                        role = "user",
+                        content = "请详细解释以下代码的功能、逻辑和关键点，用中文回答：\n\n```{{filetype}}\n{{selection}}\n```",
+                        opts = { contains_code = true },
+                    },
+                },
+            },
+            -- 代码优化
+            ["Optimize Code"] = {
+                strategy = "inline",
+                description = "优化选中的代码",
+                opts = {
+                    index = 2,
+                    is_slash_cmd = true,
+                    short_name = "opt",
+                },
+                prompts = {
+                    {
+                        role = "user",
+                        content = "请优化以下代码，提高性能、可读性和最佳实践，保持原有功能不变：\n\n```{{filetype}}\n{{selection}}\n```",
+                        opts = { contains_code = true },
+                    },
+                },
+            },
+            -- 添加注释
+            ["Add Comments"] = {
+                strategy = "inline",
+                description = "为代码添加注释",
+                opts = {
+                    index = 3,
+                    is_slash_cmd = true,
+                    short_name = "comment",
+                },
+                prompts = {
+                    {
+                        role = "user",
+                        content = "请为以下代码添加详细的中文注释，解释每个重要部分的作用：\n\n```{{filetype}}\n{{selection}}\n```",
+                        opts = { contains_code = true },
+                    },
+                },
+            },
+            -- 修复 Bug
+            ["Fix Bug"] = {
+                strategy = "chat",
+                description = "分析并修复代码中的问题",
+                opts = {
+                    index = 4,
+                    is_slash_cmd = true,
+                    short_name = "fix",
+                },
+                prompts = {
+                    {
+                        role = "user",
+                        content = "请分析以下代码中可能存在的问题并提供修复方案：\n\n```{{filetype}}\n{{selection}}\n```",
+                        opts = { contains_code = true },
+                    },
+                },
+            },
+            -- 生成测试
+            ["Generate Tests"] = {
+                strategy = "chat",
+                description = "为代码生成测试用例",
+                opts = {
+                    index = 5,
+                    is_slash_cmd = true,
+                    short_name = "test",
+                },
+                prompts = {
+                    {
+                        role = "user",
+                        content = "请为以下代码生成完整的测试用例，包括正常情况、边界情况和异常情况：\n\n```{{filetype}}\n{{selection}}\n```",
+                        opts = { contains_code = true },
+                    },
+                },
+            },
             -- 名为"Generate a Commit Message"的提示
             ["Generate a Commit Message"] = {
                 strategy = "chat",                         -- 使用聊天策略
@@ -199,5 +283,14 @@ git diff:
             silent = true,                               -- 静默执行
         },
         { "<leader>di", "<cmd>CodeCompanionChat<cr>", desc = "CodeCompanionChat" },
+        { "<leader>da", "<cmd>CodeCompanionActions<cr>", desc = "CodeCompanion Actions" },
+        { "<leader>dg", "<cmd>CodeCompanionChat Toggle<cr>", desc = "Toggle CodeCompanion" },
+        { "<leader>dd", "<cmd>CodeCompanion<cr>", desc = "CodeCompanion inline", mode = { "n", "v" } },
+        -- 代码分析快捷键
+        { "<leader>de", function() require("codecompanion").prompt("explain") end, desc = "Explain code", mode = "v" },
+        { "<leader>do", function() require("codecompanion").prompt("opt") end, desc = "Optimize code", mode = "v" },
+        { "<leader>dc", function() require("codecompanion").prompt("comment") end, desc = "Add comments", mode = "v" },
+        { "<leader>dx", function() require("codecompanion").prompt("fix") end, desc = "AI Fix bug", mode = "v" },
+        { "<leader>dt", function() require("codecompanion").prompt("test") end, desc = "Generate tests", mode = "v" },
     },
 }

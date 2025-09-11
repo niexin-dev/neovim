@@ -5,7 +5,7 @@ return {
     cmd = "Neogen",
     keys = {
         {
-            "<leader>dc", -- 设置快捷键为 <leader>cn（你可以根据需要更改）
+            "<leader>ge", -- 生成注释
             function()
                 require("neogen").generate({})
             end,
