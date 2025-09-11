@@ -23,3 +23,13 @@ vim.keymap.set({'n', 'v'}, 'k', 'gk', { noremap = true, silent = true })
 -- 将 j 映射为 gj (向下移动一行屏幕行)
 vim.keymap.set({'n', 'v'}, 'j', 'gj', { noremap = true, silent = true })
 
+
+-- 更好的缩进
+vim.keymap.set("v", "<", "<gv", { desc = "Indent left" })
+vim.keymap.set("v", ">", ">gv", { desc = "Indent right" })
+
+-- 清除搜索高亮
+vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
+
+-- 快速保存
+vim.keymap.set("n", "<leader>w", "<cmd>w<CR>", { desc = "Save file" })

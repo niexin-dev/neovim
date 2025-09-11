@@ -11,9 +11,6 @@ vim.opt.shiftwidth = 4
 vim.opt.expandtab = true
 vim.opt.autoindent = true
 
--- 防止包裹
-vim.opt.wrap = false
-
 -- 光标行
 vim.opt.cursorline = true
 
@@ -139,3 +136,15 @@ end
 
 -- 执行剪贴板设置
 setup_clipboard()
+
+-- 性能优化
+vim.opt.updatetime = 250 -- 更快的 CursorHold 事件
+vim.opt.timeoutlen = 300 -- 更快的按键序列超时
+vim.opt.lazyredraw = false -- 不延迟重绘（现代终端性能足够）
+
+-- 更好的补全体验
+vim.opt.pumheight = 10 -- 限制补全菜单高度
+vim.opt.completeopt = "menu,menuone,noselect"
+
+-- 更好的搜索体验
+vim.opt.inccommand = "split" -- 实时预览替换效果

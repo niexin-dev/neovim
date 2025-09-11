@@ -4,7 +4,7 @@ return {
         'OXY2DEV/markview.nvim',
         'nvim-treesitter/nvim-treesitter-textobjects', -- 确保安装了textobjects插件
     },
-    event = { "BufReadPost", "BufNewFile" },
+    event = { "BufReadPre", "BufNewFile" },
     build = ":TSUpdate",
     opts = {
         highlight = { enable = true },
@@ -28,6 +28,11 @@ return {
             "regex",
             "vim",
             "vimdoc",
+            "python",
+            "rust",
+            "go",
+            "javascript",
+            "typescript",
         },
         incremental_selection = {
             enable = true,
