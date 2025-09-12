@@ -68,8 +68,10 @@ return {
         -- 配置自动插入
         completion = {
             list = {
-                selection = { preselect = true, auto_insert = true }
+                selection = { preselect = true, auto_insert = false }
             },
+            accept = { auto_brackets = { enabled = true } },  -- 自动添加括号
+            documentation = { auto_show = true, auto_show_delay_ms = 200 },  -- 快速显示文档
         },
     },
     opts_extend = { "sources.default" }
