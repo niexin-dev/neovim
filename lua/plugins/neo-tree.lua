@@ -9,6 +9,7 @@ return {
     keys = {
         { "<leader>fe", "<cmd>Neotree toggle<cr>", desc = "Toggle file explorer" },
         { "<leader>fE", "<cmd>Neotree focus<cr>",  desc = "Focus file explorer" },
+        { "<leader>fg", "<cmd>Neotree git_status<cr>", desc = "Git status" },
     },
     opts = {
         close_if_last_window = false,
