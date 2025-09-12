@@ -4,13 +4,11 @@ return {
     cmd = { "ConformInfo" },
     keys = {
         {
-            -- Customize or remove this keymap to your liking
-            "<leader>df",
+            "<leader>fm",
             function()
                 require("conform").format({ async = true, lsp_format = "fallback" })
-                vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<esc>', true, false, true), 'n', false)
             end,
-            mode = "",
+            mode = { "n", "v" },
             desc = "Format buffer",
         },
     },
