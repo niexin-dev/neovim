@@ -12,10 +12,11 @@ return {
             },
             -- 将非 LSP 的工具放在这里，让 Mason 来安装它们
             ensure_installed = {
-                "clang-format", -- 格式化工具
-                "prettier",     -- 格式化工具
-                "shellcheck",   -- linter 工具
-                "shfmt",        -- 格式化工具
+                "clang-format", -- C/C++ 格式化工具
+                "prettier",     -- JS/JSON/MD 格式化工具
+                "shellcheck",   -- Shell 脚本 linter
+                "shfmt",        -- Shell 脚本格式化工具
+                "stylua",       -- Lua 格式化工具
             },
         }
     },
