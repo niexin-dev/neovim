@@ -6,6 +6,7 @@ return {
     event = { "BufReadPost", "InsertEnter" },
     config = function()
         require("codeium").setup({
+            enable_chat = false, -- 禁用聊天
         })
-    end
+    end,
 }
