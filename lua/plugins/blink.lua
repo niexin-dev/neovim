@@ -1,7 +1,7 @@
 return {
     'saghen/blink.cmp',
     event = "InsertEnter",
-    dependencies = { "codeium.nvim", "saghen/blink.compat", "olimorris/codecompanion.nvim" },
+    dependencies = { "saghen/blink.compat" },
     -- optional: provides snippets for the snippet source
     -- dependencies = {
     --     'rafamadriz/friendly-snippets',

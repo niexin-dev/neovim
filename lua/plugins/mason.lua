@@ -2,6 +2,7 @@ return {
     {
         "williamboman/mason.nvim",
         cmd = { "Mason", "MasonInstall", "MasonUpdate" },
+        priority = 1100,
         opts = {
             ui = {
                 icons = {

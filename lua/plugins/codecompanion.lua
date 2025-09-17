@@ -2,12 +2,15 @@
 return {
     -- 插件GitHub仓库地址
     "olimorris/codecompanion.nvim",
+    event = "VeryLazy",
+    priority = 900,
     -- 自动加载默认配置
     config = true,
     -- 声明依赖的其他插件
     dependencies = {
         "nvim-lua/plenary.nvim",           -- 提供Lua工具函数
         "nvim-treesitter/nvim-treesitter", -- 语法分析
+        "ravitemer/codecompanion-history.nvim", -- 历史记录
     },
     
     version = "*",
@@ -286,6 +289,7 @@ git diff:
         { "<leader>da", "<cmd>CodeCompanionActions<cr>", desc = "CodeCompanion Actions" },
         { "<leader>dg", "<cmd>CodeCompanionChat Toggle<cr>", desc = "Toggle CodeCompanion" },
         { "<leader>dd", "<cmd>CodeCompanion<cr>", desc = "CodeCompanion inline", mode = { "n", "v" } },
+        { "<leader>dh", "<cmd>CodeCompanionHistory<cr>", desc = "CodeCompanion History" },
         -- 代码分析快捷键
         { "<leader>de", function() require("codecompanion").prompt("explain") end, desc = "Explain code", mode = "v" },
         { "<leader>do", function() require("codecompanion").prompt("opt") end, desc = "Optimize code", mode = "v" },
