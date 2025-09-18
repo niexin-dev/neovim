@@ -2,8 +2,6 @@
 return {
     -- 插件GitHub仓库地址
     "olimorris/codecompanion.nvim",
-    event = "VeryLazy",
-    priority = 900,
     -- 自动加载默认配置
     config = true,
     -- 声明依赖的其他插件
