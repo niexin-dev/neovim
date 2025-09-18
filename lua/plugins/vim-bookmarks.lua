@@ -2,15 +2,6 @@ return {
 	"MattesGroeger/vim-bookmarks",
 	name = "bookmarks",
 	event = "BufReadPost", -- 确保插件在文件加载时启动
-	-- 添加快捷键定义
-	keys = {
-		{ "mm", "<cmd>BookmarkToggle<cr>", desc = "Toggle bookmark" },
-		{ "mi", "<cmd>BookmarkAnnotate<cr>", desc = "Annotate bookmark" },
-		{ "mj", "<cmd>BookmarkNext<cr>", desc = "Next bookmark" },
-		{ "mk", "<cmd>BookmarkPrev<cr>", desc = "Previous bookmark" },
-		{ "ma", "<cmd>BookmarkShowAll<cr>", desc = "Show all bookmarks" },
-		{ "mc", "<cmd>BookmarkClearAll<cr>", desc = "Clear all bookmarks" },
-	},
 	cmd = {
 		"BookmarkToggle",
 		"BookmarkAnnotate",
