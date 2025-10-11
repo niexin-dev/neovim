@@ -34,12 +34,18 @@ vim.opt.signcolumn = "yes"
 vim.opt.mouse = ""
 
 -- 打开文件时自动跳转到关闭前的光标位置
-vim.cmd([[
-  augroup restore_cursor_position
-    autocmd!
-    autocmd BufReadPost * if line("'\"") > 1 && line("'\"") <= line("$") | exe "normal! g`\"" | endif
-  augroup END
-]])
+vim.api.nvim_create_autocmd('BufReadPost', {
+  pattern = '*',
+  callback = function()
+    -- 检查是否为普通文件缓冲区，并且该缓冲区有关联的文件
+    if vim.bo.buftype == '' and vim.fn.filereadable(vim.api.nvim_buf_get_name(0)) == 1 then
+      local last_pos = vim.fn.line("'\"")
+      if last_pos > 1 and last_pos <= vim.fn.line('$') then
+        vim.cmd("normal! g`\"")
+      end
+    end
+  end,
+})
 
 -- 光标会在第10行触发向上滚动，或者在倒数第10行触发向下滚动
 vim.opt.scrolloff = math.min(10, math.floor(vim.o.lines * 0.3)) -- 不超过窗口高度的30%
