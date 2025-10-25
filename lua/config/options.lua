@@ -34,17 +34,17 @@ vim.opt.signcolumn = "yes"
 vim.opt.mouse = ""
 
 -- 打开文件时自动跳转到关闭前的光标位置
-vim.api.nvim_create_autocmd('BufReadPost', {
-  pattern = '*',
-  callback = function()
-    -- 检查是否为普通文件缓冲区，并且该缓冲区有关联的文件
-    if vim.bo.buftype == '' and vim.fn.filereadable(vim.api.nvim_buf_get_name(0)) == 1 then
-      local last_pos = vim.fn.line("'\"")
-      if last_pos > 1 and last_pos <= vim.fn.line('$') then
-        vim.cmd("normal! g`\"")
-      end
-    end
-  end,
+vim.api.nvim_create_autocmd("BufReadPost", {
+	pattern = "*",
+	callback = function()
+		-- 检查是否为普通文件缓冲区，并且该缓冲区有关联的文件
+		if vim.bo.buftype == "" and vim.fn.filereadable(vim.api.nvim_buf_get_name(0)) == 1 then
+			local last_pos = vim.fn.line("'\"")
+			if last_pos > 1 and last_pos <= vim.fn.line("$") then
+				vim.cmd('normal! g`"')
+			end
+		end
+	end,
 })
 
 -- 光标会在第10行触发向上滚动，或者在倒数第10行触发向下滚动
@@ -69,75 +69,74 @@ vim.opt.fileencodings = "utf-8,euc-cn,ucs-bom,gb18030,gbk,gb2312,cp936"
 vim.wo.wrap = true -- 启用换行
 vim.wo.linebreak = true -- 在单词边界换行（避免截断单词）
 vim.wo.breakindent = true -- 保持缩进
-vim.wo.showbreak = '↪ ' -- 折行显示前缀符号（可选）
+vim.wo.showbreak = "↪ " -- 折行显示前缀符号（可选）
 
 -- 添加错误处理
 -- vim.diagnostic.config({ virtual_lines = true })
 
-
 -- 剪贴板统一配置函数
 local function setup_clipboard()
-    -- vim.opt.clipboard = "unnamedplus"
-    vim.opt.clipboard:append({ "unnamed", "unnamedplus" })
+	-- vim.opt.clipboard = "unnamedplus"
+	vim.opt.clipboard:append({ "unnamed", "unnamedplus" })
 
-    -- 检查是否在 WSL 环境
-    if vim.fn.has('wsl') == 1 then
-        -- print("Setting up WSL clipboard") -- 调试信息
-        -- 使用 win32yank 实现 Windows 和 WSL 之间的剪贴板共享
-        vim.g.clipboard = {
-            name = 'win32yank-wsl',
-            copy = {
-                ['+'] = 'win32yank.exe -i --crlf',
-                ['*'] = 'win32yank.exe -i --crlf',
-            },
-            paste = {
-                ['+'] = 'win32yank.exe -o --lf',
-                ['*'] = 'win32yank.exe -o --lf',
-            },
-            cache_enabled = true,
-        }
-        return
-    end
+	-- 检查是否在 WSL 环境
+	if vim.fn.has("wsl") == 1 then
+		-- print("Setting up WSL clipboard") -- 调试信息
+		-- 使用 win32yank 实现 Windows 和 WSL 之间的剪贴板共享
+		vim.g.clipboard = {
+			name = "win32yank-wsl",
+			copy = {
+				["+"] = "win32yank.exe -i --crlf",
+				["*"] = "win32yank.exe -i --crlf",
+			},
+			paste = {
+				["+"] = "win32yank.exe -o --lf",
+				["*"] = "win32yank.exe -o --lf",
+			},
+			cache_enabled = true,
+		}
+		return
+	end
 
-    -- -- 检查是否在 Wayland 环境
-    -- if os.getenv("XDG_SESSION_TYPE") == "wayland" then
-    --     -- print("Setting up Wayland clipboard") -- 调试信息
-    --     vim.g.clipboard = {
-    --         name = 'wl-copy',
-    --         copy = {
-    --             ['+'] = 'wl-copy',
-    --             ['*'] = 'wl-copy',
-    --         },
-    --         paste = {
-    --             ['+'] = 'wl-paste',
-    --             ['*'] = 'wl-paste',
-    --         },
-    --         cache_enabled = true,
-    --     }
-    --     return
-    -- end
+	-- -- 检查是否在 Wayland 环境
+	-- if os.getenv("XDG_SESSION_TYPE") == "wayland" then
+	--     -- print("Setting up Wayland clipboard") -- 调试信息
+	--     vim.g.clipboard = {
+	--         name = 'wl-copy',
+	--         copy = {
+	--             ['+'] = 'wl-copy',
+	--             ['*'] = 'wl-copy',
+	--         },
+	--         paste = {
+	--             ['+'] = 'wl-paste',
+	--             ['*'] = 'wl-paste',
+	--         },
+	--         cache_enabled = true,
+	--     }
+	--     return
+	-- end
 
-    -- SSH 环境下使用 OSC52 协议支持远程复制粘贴
-    if vim.env.SSH_TTY ~= nil then
-        -- print("Setting up OSC52 clipboard") -- 调试信息
-        local function osc52_paste()
-            local content = vim.fn.getreg("")
-            return vim.split(content, '\n')
-        end
+	-- SSH 环境下使用 OSC52 协议支持远程复制粘贴
+	if vim.env.SSH_TTY ~= nil then
+		-- print("Setting up OSC52 clipboard") -- 调试信息
+		local function osc52_paste()
+			local content = vim.fn.getreg("")
+			return vim.split(content, "\n")
+		end
 
-        vim.g.clipboard = {
-            name = 'OSC 52',
-            copy = {
-                ['+'] = require('vim.ui.clipboard.osc52').copy('+'),
-                ['*'] = require('vim.ui.clipboard.osc52').copy('*'),
-            },
-            paste = {
-                ['+'] = osc52_paste,
-                ['*'] = osc52_paste,
-            },
-        }
-        return
-    end
+		vim.g.clipboard = {
+			name = "OSC 52",
+			copy = {
+				["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+				["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+			},
+			paste = {
+				["+"] = osc52_paste,
+				["*"] = osc52_paste,
+			},
+		}
+		return
+	end
 end
 
 -- 执行剪贴板设置
