@@ -28,6 +28,14 @@ return {
         vim.lsp.config('*', {
             capabilities = capabilities,
         })
+
+        -- stylua 仅作为外部格式化器使用，避免其通过 LSP 再次附着到 Lua 缓冲区
+        local stylua_cfg = vim.lsp.config['stylua']
+        if stylua_cfg then
+            stylua_cfg.autostart = false
+            stylua_cfg.cmd = nil
+        end
+
         local uv = vim.uv or vim.loop
 
         vim.lsp.config['clangd'] = {
@@ -105,6 +113,11 @@ return {
                 end
 
                 local bufnr = event.buf
+
+                if client.name == 'stylua' then
+                    client:stop()
+                    return
+                end
 
                 if client:supports_method('textDocument/inlayHint') then
                     enable_inlay_hints(bufnr)
