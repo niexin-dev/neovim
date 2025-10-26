@@ -46,6 +46,9 @@ return {
 	},
 	{
 		"williamboman/mason-lspconfig.nvim",
+		-- 与 nvim-lspconfig 共用同一组延迟事件，声明依赖只会确保加载顺序，不会提前触发任一插件
+		-- 修复lsp.log中的警告“[WARN][2025-10-25 21:11:51] /usr/local/share/nvim/runtime/lua/vim/lsp/log.lua:151	"clangd does not have a configuration"
+		dependencies = { "neovim/nvim-lspconfig" },
 		event = { "BufReadPre", "BufNewFile" },
 		opts = {
 			-- 这里只放 nvim-lspconfig 支持的 LSP 服务器名称
