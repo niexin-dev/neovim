@@ -3,6 +3,7 @@ return {
 	-- 插件GitHub仓库地址
 	"olimorris/codecompanion.nvim",
 	-- 自动加载默认配置
+	cmd = { "CodeCompanion", "CodeCompanionChat", "CodeCompanionActions", "CodeCompanionAsk" },
 	config = true,
 	-- 声明依赖的其他插件
 	dependencies = {
