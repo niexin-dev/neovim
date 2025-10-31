@@ -25,8 +25,26 @@ return {
 			lualine_b = { "branch", "diff", "diagnostics" },
 			lualine_c = {
 				{ "filename", path = 1 },
-				function()
-					return require("nvim-treesitter").statusline({
+				(function()
+					local uv = vim.uv or vim.loop
+					local cache = ""
+					local last_update = -1000
+					local update_interval = 250
+
+					local get_now = function()
+						if uv and uv.now then
+							return uv.now()
+						end
+
+						local loop = vim.loop
+						if loop and loop.hrtime then
+							return math.floor(loop.hrtime() / 1000000)
+						end
+
+						return update_interval + last_update
+					end
+
+					local status_opts = {
 						indicator_size = 100,
 						type_patterns = { "class", "function", "method" },
 						transform_fn = function(line, node)
@@ -58,8 +76,45 @@ return {
 
 						separator = " -> ",
 						allow_duplicates = false,
-					})
-				end,
+					}
+
+					return function()
+						local now = get_now()
+						if (now - last_update) < update_interval and cache ~= "" then
+							return cache
+						end
+
+						last_update = now
+
+						if vim.bo.buftype ~= "" then
+							cache = ""
+							return cache
+						end
+
+						local ft = vim.bo.filetype
+						if not ft or ft == "" then
+							cache = ""
+							return cache
+						end
+
+						local ok_parsers, parsers = pcall(require, "nvim-treesitter.parsers")
+						if not ok_parsers or not parsers.has_parser(ft) then
+							cache = ""
+							return cache
+						end
+
+						local ok_ts, ts = pcall(require, "nvim-treesitter")
+						if not ok_ts or type(ts.statusline) ~= "function" then
+							cache = ""
+							return cache
+						end
+
+						local ok_status, status = pcall(ts.statusline, status_opts)
+						cache = (ok_status and status) or ""
+
+						return cache
+					end
+				end)(),
 			},
 			lualine_x = { "encoding", "fileformat", "filetype" },
 			lualine_y = { "progress" },
