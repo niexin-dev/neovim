@@ -36,7 +36,7 @@ return {
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",
 		dependencies = { "williamboman/mason.nvim" },
-		cmd = { "MasonToolsInstall", "MasonToolsUpdate", "MasonToolsClean", "MasonToolsCheck" },
+		cmd = { "MasonToolsInstall", "MasonToolsUpdate", "MasonToolsClean" },
 		-- mason-tool-installer.nvim 用于确保通用开发工具按需安装与更新
 		opts = {
 			ensure_installed = tools,
