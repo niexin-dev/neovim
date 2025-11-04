@@ -8,8 +8,19 @@ return {
 			function()
 				require("conform").format({ async = true, lsp_format = "fallback" })
 			end,
-			mode = { "n", "v" },
+			mode = { "n" },
 			desc = "Format buffer",
+		},
+		{
+			"<leader>fm",
+			function()
+				require("conform").format({ async = true, lsp_format = "fallback" })
+				vim.schedule(function()
+					vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", false, false, true), "x", false)
+				end)
+			end,
+			mode = { "v" },
+			desc = "Format selection",
 		},
 	},
 	-- 为 Lua 语言服务器提供类型标注提示
