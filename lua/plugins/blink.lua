@@ -31,11 +31,11 @@ end
 return {
 	"saghen/blink.cmp",
 	event = "InsertEnter",
-	dependencies = { "saghen/blink.compat" },
+	-- dependencies = { "saghen/blink.compat" },
 	-- 设为 false 以始终拉取 main 分支的最新源码
 	version = false,
 	-- 如需 snippet 来源，可在此添加相应依赖
-	-- 依赖项示例 = {
+	-- dependencies = {
 	--     'rafamadriz/friendly-snippets',
 	--     "giuxtaposition/blink-cmp-copilot",
 	-- },
@@ -84,7 +84,7 @@ return {
 			providers = {
 				codeium = {
 					name = "codeium",
-					module = "blink.compat.source",
+					module = "codeium.blink",
 					score_offset = 100,
 					async = true,
 				},
@@ -103,38 +103,6 @@ return {
 			},
 			accept = { auto_brackets = { enabled = true } }, -- 自动添加括号
 			documentation = { auto_show = true, auto_show_delay_ms = 200 }, -- 快速显示文档
-			-- 图标在左，文本在右；统一去掉所有来源的前导空格
-			menu = {
-				draw = {
-					-- 第一列：图标/种类（在左边）
-					-- 第二列：label 与可选的 label_description（在右边）
-					columns = {
-						-- { "kind_icon", "kind" },
-						{ "kind_icon" },
-						{ "label", "label_description", gap = 1 },
-					},
-					components = {
-						-- 图标后面补 1 格，让文本不贴图标
-						kind_icon = {
-							text = function(ctx)
-								return (ctx.kind_icon or "") .. " "
-							end,
-						},
-						-- 去掉 label 的所有前导空白，不再额外补空格
-						label = {
-							text = function(ctx)
-								return (ctx.label or ""):gsub("^%s+", "")
-							end,
-						},
-						-- 可选：描述也去掉前导空白
-						label_description = {
-							text = function(ctx)
-								return (ctx.label_description or ""):gsub("^%s+", "")
-							end,
-						},
-					},
-				},
-			},
 		},
 	},
 	opts_extend = { "sources.default" },
