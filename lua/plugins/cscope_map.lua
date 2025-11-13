@@ -14,6 +14,10 @@ return {
 	--         }
 	--     })
 	-- end,
+	keys = {
+		{ "<leader>cj", "<cmd>CsStackView open down<cr>", desc = "Cscope StackView Down" },
+		{ "<leader>ck", "<cmd>CsStackView open up<cr>", desc = "Cscope StackView Up" },
+	},
 	opts = {
 		skip_input_prompt = true, -- "true" doesn't ask for input
 		cscope = {
