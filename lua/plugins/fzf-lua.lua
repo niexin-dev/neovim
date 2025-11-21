@@ -2,18 +2,6 @@ return {
 	"ibhagwan/fzf-lua",
 	dependencies = { "nvim-tree/nvim-web-devicons" },
 
-	init = function()
-		vim.api.nvim_create_autocmd("VimEnter", {
-			callback = function()
-				if vim.fn.argc() == 0 then
-					vim.schedule(function()
-						require("fzf-lua").oldfiles()
-					end)
-				end
-			end,
-		})
-	end,
-
 	keys = {
 		{ "<leader>b", "<cmd>FzfLua buffers sort_mru=true sort_lastused=true<cr>", desc = "Buffers" },
 		{ "<leader>ff", "<cmd>FzfLua files<cr>", desc = "Files" },
