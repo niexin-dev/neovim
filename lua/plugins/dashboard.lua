@@ -7,6 +7,7 @@ return {
 	config = function()
 		local api = vim.api
 		local fn = vim.fn
+		local uv = vim.loop
 
 		-----------------------------------------------------
 		-- devicons / tokyonight 安全加载
@@ -82,7 +83,66 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- 打开文件并 cd 到 git root（仅处理本地文件）
+		-- 查找 git root（带缓存，整棵项目树只爬一次）
+		-----------------------------------------------------
+		local git_root_cache = {}
+		local NO_GIT_KEY = "__NO_GIT_ROOT__"
+
+		local function find_git_root(path)
+			if not is_local_path(path) then
+				return nil
+			end
+
+			-- 统一用绝对路径
+			local abspath = fn.fnamemodify(path, ":p")
+			if abspath == "" then
+				return nil
+			end
+
+			-- 如果传进来的是目录，就从目录本身开始；否则从父目录开始
+			local dir = fn.isdirectory(abspath) == 1 and abspath or fn.fnamemodify(abspath, ":h")
+			if dir == "" then
+				return nil
+			end
+
+			local visited = {}
+			local root = nil
+			local cur = dir
+
+			while cur and cur ~= "" do
+				-- 命中缓存（这一步可以省很多遍历）
+				if git_root_cache[cur] ~= nil then
+					root = git_root_cache[cur]
+					break
+				end
+
+				table.insert(visited, cur)
+
+				-- 检查 cur/.git 是否存在（目录或文件都算）
+				local stat = uv.fs_stat(cur .. "/.git")
+				if stat then
+					root = cur
+					break
+				end
+
+				-- 向上一层
+				local parent = fn.fnamemodify(cur, ":h")
+				if parent == cur then
+					break
+				end
+				cur = parent
+			end
+
+			-- 把这次路径上所有目录都写进缓存
+			for _, d in ipairs(visited) do
+				git_root_cache[d] = root
+			end
+
+			return root
+		end
+
+		-----------------------------------------------------
+		-- 打开文件并 cd 到 git root（复用 find_git_root）
 		-----------------------------------------------------
 		local function open_oldfile(path)
 			if not path or path == "" then
@@ -94,7 +154,8 @@ return {
 				return
 			end
 
-			local dir = fn.fnamemodify(path, ":p:h")
+			local abspath = fn.fnamemodify(path, ":p")
+			local dir = fn.fnamemodify(abspath, ":h")
 
 			-- 目录不存在就不要 cd，直接试着打开文件
 			if dir == "" or fn.isdirectory(dir) == 0 then
@@ -102,14 +163,10 @@ return {
 				return
 			end
 
-			local root = fn.systemlist({ "git", "-C", dir, "rev-parse", "--show-toplevel" })[1]
+			local root = find_git_root(path)
+			local target_dir = (root and fn.isdirectory(root) == 1) and root or dir
 
-			if vim.v.shell_error == 0 and root and root ~= "" and fn.isdirectory(root) == 1 then
-				vim.cmd("cd " .. fn.fnameescape(root))
-			else
-				vim.cmd("cd " .. fn.fnameescape(dir))
-			end
-
+			vim.cmd("cd " .. fn.fnameescape(target_dir))
 			vim.cmd.edit(fn.fnameescape(path))
 		end
 
@@ -197,7 +254,27 @@ return {
 		})
 
 		-----------------------------------------------------
-		-- 主渲染函数
+		-- 小工具：按 git root 分组
+		-----------------------------------------------------
+		local function group_files_by_root(files)
+			local grouped = {}
+			local roots_order = {}
+
+			for _, fname in ipairs(files) do
+				local root = find_git_root(fname)
+				local key = root or NO_GIT_KEY
+				if not grouped[key] then
+					grouped[key] = {}
+					table.insert(roots_order, key)
+				end
+				table.insert(grouped[key], fname)
+			end
+
+			return grouped, roots_order
+		end
+
+		-----------------------------------------------------
+		-- 主渲染函数（按 git root 分组）
 		-----------------------------------------------------
 		local function render(max_entries)
 			max_entries = max_entries or 10
@@ -221,38 +298,64 @@ return {
 			table.insert(lines, "  " .. string.rep("─", math.min(vim.o.columns - 4, 50)))
 			table.insert(lines, "")
 
-			---------------- ENTRIES ----------------
+			---------------- 按 git root 分组 ----------------
+			local grouped, roots_order = group_files_by_root(old)
+
 			local entries = {}
 			local label_index = 1
+			local group_header_lnums = {}
 
-			for _, fname in ipairs(old) do
-				local label = (label_index == 10) and "0" or tostring(label_index)
-				local prefix = "  [" .. label .. "]  "
+			for ri, root_key in ipairs(roots_order) do
+				local files = grouped[root_key]
 
-				local path = fn.fnamemodify(fname, ":~:.")
-				local icon, icon_hl = get_icon_cached(fname)
-				local icon_part = icon ~= "" and (icon .. " ") or ""
-				local full_line = prefix .. icon_part .. path
+				local title
+				if root_key == NO_GIT_KEY then
+					title = "    Other files"
+				else
+					title = "    " .. fn.fnamemodify(root_key, ":~:.")
+				end
 
-				table.insert(lines, full_line)
+				local group_lnum = #lines + 1
+				table.insert(lines, title)
+				table.insert(group_header_lnums, group_lnum)
 
-				local lnum = #lines
-				local path_start = #prefix + #icon_part
-				local ps, pe, fe = split_ranges(full_line, path_start)
+				for _, fname in ipairs(files) do
+					if label_index > 10 then
+						break
+					end
 
-				entries[#entries + 1] = {
-					lnum = lnum,
-					full = full_line,
-					ps = ps,
-					pe = pe,
-					fe = fe,
-					icon = icon,
-					icon_col = #prefix,
-					icon_hl = icon_hl,
-					raw = fname,
-				}
+					local label = (label_index == 10) and "0" or tostring(label_index)
+					local prefix = "  [" .. label .. "]  "
 
-				label_index = label_index + 1
+					local path = fn.fnamemodify(fname, ":~:.")
+					local icon, icon_hl = get_icon_cached(fname)
+					local icon_part = icon ~= "" and (icon .. " ") or ""
+					local full_line = prefix .. icon_part .. path
+
+					table.insert(lines, full_line)
+
+					local lnum = #lines
+					local path_start = #prefix + #icon_part
+					local ps, pe, fe = split_ranges(full_line, path_start)
+
+					entries[#entries + 1] = {
+						lnum = lnum,
+						full = full_line,
+						ps = ps,
+						pe = pe,
+						fe = fe,
+						icon = icon,
+						icon_col = #prefix,
+						icon_hl = icon_hl,
+						raw = fname,
+					}
+
+					label_index = label_index + 1
+				end
+
+				if ri < #roots_order then
+					table.insert(lines, "")
+				end
 			end
 
 			if #entries == 0 then
@@ -281,7 +384,7 @@ return {
 			api.nvim_set_option_value("modifiable", false, { buf = buf })
 			api.nvim_set_option_value("filetype", "startup-dashboard", { buf = buf })
 
-			---------------- 高亮（用 add_highlight，安全） ----------------
+			---------------- 高亮 ----------------
 
 			-- Header 整行
 			for i = 0, header_count - 1 do
@@ -292,7 +395,10 @@ return {
 			api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", section_lnum - 1, 0, -1)
 			api.nvim_buf_add_highlight(buf, -1, "OldfilesHint", hint_lnum - 1, 0, -1)
 
-			-- Entries
+			for _, lnum in ipairs(group_header_lnums) do
+				api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", lnum - 1, 0, -1)
+			end
+
 			for _, e in ipairs(entries) do
 				local l0 = e.lnum - 1
 				local line = lines[e.lnum] or ""
