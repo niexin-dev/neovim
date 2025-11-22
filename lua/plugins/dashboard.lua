@@ -27,8 +27,16 @@ return {
 				return
 			end
 
-			local max_items = 26
+			local max_items = 10
 			local oldfiles = {}
+
+			local function label_for_index(index)
+				if index == 10 then
+					return "0"
+				end
+
+				return tostring(index)
+			end
 
 			for _, path in ipairs(vim.v.oldfiles or {}) do
 				oldfiles[#oldfiles + 1] = path
@@ -61,11 +69,18 @@ return {
 			table.insert(lines, "")
 			table.insert(lines, "  Recent files")
 
+			local first_path_line
+
 			if vim.tbl_isempty(oldfiles) then
 				table.insert(lines, "   (no recent files)")
 			else
 				for index, path in ipairs(oldfiles) do
-					local label = string.char(string.byte("a") + index - 1)
+					local label = label_for_index(index)
+
+					if not first_path_line then
+						first_path_line = #lines + 1
+					end
+
 					table.insert(lines, string.format("  %s  %s", label, vim.fn.fnamemodify(path, ":~:.")))
 				end
 			end
@@ -74,6 +89,10 @@ return {
 			setopt("modifiable", false, { buf = buf })
 			vim.api.nvim_win_set_buf(win, buf)
 
+			if first_path_line then
+				vim.api.nvim_win_set_cursor(win, { first_path_line, 0 })
+			end
+
 			local function open_index(target_index)
 				if target_index > 0 and target_index <= #oldfiles then
 					open_oldfile(oldfiles[target_index])
@@ -81,7 +100,7 @@ return {
 			end
 
 			for i = 1, math.min(#oldfiles, max_items) do
-				local label = string.char(string.byte("a") + i - 1)
+				local label = label_for_index(i)
 
 				vim.keymap.set("n", label, function()
 					open_index(i)
@@ -90,10 +109,10 @@ return {
 
 			vim.keymap.set("n", "<CR>", function()
 				local line = vim.api.nvim_get_current_line()
-				local key = line:match("^%s*([a-z])%s")
+				local key = line:match("^%s*([0-9])%s")
 
 				if key then
-					local index = string.byte(key) - string.byte("a") + 1
+					local index = key == "0" and 10 or tonumber(key)
 					open_index(index)
 				end
 			end, { buffer = buf, silent = true })
