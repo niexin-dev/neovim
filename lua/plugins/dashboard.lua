@@ -1,5 +1,5 @@
 return {
-	name = "startup-dashboard",
+	name = "dashboard",
 	dir = vim.fn.stdpath("config"),
 	lazy = false,
 	priority = 1000,
@@ -333,14 +333,14 @@ return {
 			-- 写入 buffer
 			api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 			api.nvim_win_set_buf(win, buf)
-			api.nvim_buf_set_name(buf, "startup-dashboard")
+			api.nvim_buf_set_name(buf, "dashboard")
 			api.nvim_buf_set_var(buf, "startup_entries", entries)
 
 			api.nvim_set_option_value("buftype", "nofile", { buf = buf })
 			api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
 			api.nvim_set_option_value("swapfile", false, { buf = buf })
 			api.nvim_set_option_value("modifiable", false, { buf = buf })
-			api.nvim_set_option_value("filetype", "startup-dashboard", { buf = buf })
+			api.nvim_set_option_value("filetype", "dashboard", { buf = buf })
 
 			-- 高亮
 			for i = 0, header_count - 1 do
