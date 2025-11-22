@@ -5,221 +5,297 @@ return {
 	priority = 1000,
 
 	config = function()
-		vim.opt.termguicolors = true
+		local api = vim.api
+		local fn = vim.fn
 
-		-- icons
+		-----------------------------------------------------
+		-- devicons / tokyonight 安全加载
+		-----------------------------------------------------
 		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
 
-		-- Tokyonight colors
-		local function get_colors()
+		local ok_colors, tn_colors = pcall(function()
 			return require("tokyonight.colors").setup()
-		end
+		end)
 
-		-- Apply custom highlights
+		local colors = ok_colors and tn_colors
+			or {
+				magenta = "#ff79c6",
+				blue = "#61afef",
+				orange = "#d19a66",
+				cyan = "#56b6c2",
+				comment = "#5c6370",
+			}
+
+		-----------------------------------------------------
+		-- 高亮定义
+		-----------------------------------------------------
 		local function setup_hl()
-			local c = get_colors()
-			vim.api.nvim_set_hl(0, "OldfilesHeader", { fg = c.magenta, bold = true, force = true }) -- ASCII 标题
-			vim.api.nvim_set_hl(0, "OldfilesSection", { fg = c.blue, bold = true, force = true }) -- “Recent files”
-			vim.api.nvim_set_hl(0, "OldfilesIndex", { fg = c.orange, bold = true, force = true }) -- [1] [2]
-			vim.api.nvim_set_hl(0, "OldfilesPath", { fg = c.comment, italic = true, force = true }) -- 路径
-			vim.api.nvim_set_hl(0, "OldfilesFilename", { fg = c.cyan, bold = true, force = true }) -- 文件名
-			vim.api.nvim_set_hl(0, "OldfilesHint", { fg = c.comment, italic = true, force = true }) -- 底部提示
+			local hl = {
+				OldfilesHeader = { fg = colors.magenta, bold = true },
+				OldfilesSection = { fg = colors.blue, bold = true },
+				OldfilesIndex = { fg = colors.orange, bold = true },
+				OldfilesPath = { fg = colors.comment, italic = true },
+				OldfilesFilename = { fg = colors.cyan, bold = true },
+				OldfilesHint = { fg = colors.comment, italic = true },
+			}
+			for k, v in pairs(hl) do
+				api.nvim_set_hl(0, k, v)
+			end
 		end
 
-		-- Helper: find path + filename ranges（现在用 path_start，而不是 label）
-		local function split_ranges(full_line, path_start)
-			-- 找出最后一段非 / 或 \ 的部分（文件名）
-			local m = vim.fn.matchstrpos(full_line, [[\v[^/\\]+$]])
-			local fname_s, fname_e = m[2], m[3]
+		-----------------------------------------------------
+		-- 图标缓存（使用 devicons 自带 hl_group）
+		-----------------------------------------------------
+		local icon_cache = {}
+		local function get_icon_cached(fname)
+			if not has_devicons then
+				return "", nil
+			end
+			if icon_cache[fname] then
+				return icon_cache[fname].icon, icon_cache[fname].hl
+			end
+			local ext = fn.fnamemodify(fname, ":e")
+			local icon, hl = devicons.get_icon(fname, ext, { default = true })
+			icon_cache[fname] = { icon = icon or "", hl = hl }
+			return icon_cache[fname].icon, icon_cache[fname].hl
+		end
 
+		-----------------------------------------------------
+		-- 拆分路径 / 文件名范围（用 Vim 的 matchstrpos）
+		-----------------------------------------------------
+		local function split_ranges(full_line, path_start)
+			local m = fn.matchstrpos(full_line, [[\v[^/\\]+$]])
+			local fname_s, fname_e = m[2], m[3]
 			if fname_s < 0 then
-				-- 没有文件名（如 fugitive://…//），整段都是路径
 				return path_start, nil, nil
 			end
-
 			local path_end = fname_s
 			return path_start, path_end, fname_e
 		end
 
-		-- 打开文件（自动 cd 到 git root）
+		-----------------------------------------------------
+		-- 打开文件并 cd 到 git root
+		-----------------------------------------------------
 		local function open_oldfile(path)
 			if not path or path == "" then
 				return
 			end
-			local dir = vim.fn.fnamemodify(path, ":p:h")
-			local root = vim.fn.systemlist({ "git", "-C", dir, "rev-parse", "--show-toplevel" })[1]
+			local dir = fn.fnamemodify(path, ":p:h")
+			local root = fn.systemlist({ "git", "-C", dir, "rev-parse", "--show-toplevel" })[1]
 
 			if vim.v.shell_error == 0 and root and root ~= "" then
-				vim.cmd("cd " .. vim.fn.fnameescape(root))
+				vim.cmd("cd " .. fn.fnameescape(root))
 			else
-				vim.cmd("cd " .. vim.fn.fnameescape(dir))
+				vim.cmd("cd " .. fn.fnameescape(dir))
 			end
 
-			vim.cmd.edit(vim.fn.fnameescape(path))
+			vim.cmd.edit(fn.fnameescape(path))
 		end
 
-		-- 将光标对齐到当前行的 [digit] 中的数字上
-		local function center_on_index(win, line_nr)
-			line_nr = line_nr or vim.api.nvim_win_get_cursor(win)[1]
-			local line = vim.api.nvim_buf_get_lines(0, line_nr - 1, line_nr, false)[1]
-			if not line then
-				return
+		-----------------------------------------------------
+		-- 查找所有 entry 行（形如 "  [1]  ..."）
+		-----------------------------------------------------
+		local function get_entry_lines(buf)
+			local total = api.nvim_buf_line_count(buf)
+			local list = {}
+			for l = 1, total do
+				local text = api.nvim_buf_get_lines(buf, l - 1, l, false)[1]
+				if text and text:match("^%s*%[[0-9]%]") then
+					table.insert(list, l)
+				end
 			end
-
-			-- 找到 "[3]" 这种模式
-			local l, r = line:find("%[[0-9]%]")
-			if l and r then
-				-- 数字在 "[" 后面一位，Neovim 的 col 是 0-based
-				-- 这里推导：digit_pos = l + 1, col = digit_pos - 1 = l
-				vim.api.nvim_win_set_cursor(win, { line_nr, l })
-			else
-				-- 找不到就放在行首
-				vim.api.nvim_win_set_cursor(win, { line_nr, 0 })
-			end
+			return list
 		end
 
-		-- j/k 移动时，保持光标在数字上
+		-----------------------------------------------------
+		-- j / k：只在 entry 行之间循环移动
+		-----------------------------------------------------
 		local function move_delta(delta)
-			local win = vim.api.nvim_get_current_win()
-			local pos = vim.api.nvim_win_get_cursor(win)
-			local new_line = pos[1] + delta
-			local line_count = vim.api.nvim_buf_line_count(0)
+			local win = api.nvim_get_current_win()
+			local buf = api.nvim_win_get_buf(win)
 
-			if new_line < 1 then
-				new_line = 1
-			elseif new_line > line_count then
-				new_line = line_count
-			end
-
-			-- 先移动到目标行，再对齐到 [digit]
-			vim.api.nvim_win_set_cursor(win, { new_line, 0 })
-			center_on_index(win, new_line)
-		end
-
-		-- Main renderer
-		local function render()
-			if vim.fn.argc() ~= 0 or vim.api.nvim_buf_get_name(0) ~= "" then
+			local entry_lines = get_entry_lines(buf)
+			if #entry_lines == 0 then
 				return
 			end
 
-			local old = vim.v.oldfiles
-			if not old or vim.tbl_isempty(old) then
-				old = {}
-			end
-			local max = 10
+			local pos = api.nvim_win_get_cursor(win)
+			local line = pos[1]
 
-			local buf = vim.api.nvim_create_buf(false, true)
-			local win = vim.api.nvim_get_current_win()
-			vim.wo[win].winhighlight = ""
+			local cur_idx
+			for i, l in ipairs(entry_lines) do
+				if l == line then
+					cur_idx = i
+					break
+				end
+			end
+
+			if not cur_idx then
+				cur_idx = delta > 0 and 1 or #entry_lines
+			else
+				if delta > 0 then
+					cur_idx = (cur_idx % #entry_lines) + 1
+				else
+					cur_idx = (cur_idx - 2 + #entry_lines) % #entry_lines + 1
+				end
+			end
+
+			local target = entry_lines[cur_idx]
+			api.nvim_win_set_cursor(win, { target, 0 })
+
+			-- 让光标落在数字上
+			local line_text = api.nvim_buf_get_lines(buf, target - 1, target, false)[1]
+			local l = line_text and line_text:find("%[[0-9]%]")
+			if l then
+				api.nvim_win_set_cursor(win, { target, l })
+			end
+		end
+
+		-----------------------------------------------------
+		-- ASCII header
+		-----------------------------------------------------
+		local HEADER = {
+			[[    _   _   _                 _           _           _   _                          _                ]],
+			[[   | \ | | (_)   ___  __  __ (_)  _ __   ( )  ___    | \ | |   ___    ___   __   __ (_)  _ __ ___     ]],
+			[[   |  \| | | |  / _ \ \ \/ / | | | '_ \  |/  / __|   |  \| |  / _ \  / _ \  \ \ / / | | | '_ ` _ \    ]],
+			[[   | |\  | | | |  __/  >  <  | | | | | |     \__ \   | |\  | |  __/ | (_) |  \ V /  | | | | | | | |   ]],
+			[[   |_| \_| |_|  \___| /_/\_\ |_| |_| |_|     |___/   |_| \_|  \___|  \___/    \_/   |_| |_| |_| |_|   ]],
+		}
+
+		-----------------------------------------------------
+		-- 主渲染函数
+		-----------------------------------------------------
+		local function render(max_entries)
+			max_entries = max_entries or 10
+
+			local old = vim.v.oldfiles or {}
+			local buf = api.nvim_create_buf(false, true)
+			local win = api.nvim_get_current_win()
 
 			setup_hl()
-			vim.api.nvim_create_autocmd("ColorScheme", { buffer = buf, callback = setup_hl })
+			api.nvim_create_autocmd("ColorScheme", {
+				buffer = buf,
+				callback = setup_hl,
+			})
 
 			local lines = {}
+
+			---------------- HEADER ----------------
+			for _, l in ipairs(HEADER) do
+				table.insert(lines, l)
+			end
+			table.insert(lines, "")
+			local header_count = #HEADER
+
+			---------------- SECTION ----------------
+			local section_lnum = #lines + 1
+			table.insert(lines, "    Recent files")
+			table.insert(lines, "  " .. string.rep("─", math.min(vim.o.columns - 4, 50)))
+			table.insert(lines, "")
+
+			---------------- ENTRIES ----------------
 			local entries = {}
-
-			-- header ASCII
-			local header = {
-				[[    _   _   _                 _           _           _   _                          _                ]],
-				[[   | \ | | (_)   ___  __  __ (_)  _ __   ( )  ___    | \ | |   ___    ___   __   __ (_)  _ __ ___     ]],
-				[[   |  \| | | |  / _ \ \ \/ / | | | '_ \  |/  / __|   |  \| |  / _ \  / _ \  \ \ / / | | | '_ ` _ \    ]],
-				[[   | |\  | | | |  __/  >  <  | | | | | |     \__ \   | |\  | |  __/ | (_) |  \ V /  | | | | | | | |   ]],
-				[[   |_| \_| |_|  \___| /_/\_\ |_| |_| |_|     |___/   |_| \_|  \___|  \___/    \_/   |_| |_| |_| |_|   ]],
-			}
-			vim.list_extend(lines, header)
-
-			lines[#lines + 1] = ""
-
-			-- section title: Recent files
-			local section_line = #lines -- 0-based 时再减 1
-			lines[#lines + 1] = "    Recent files"
-			lines[#lines + 1] =
-				"  ───────────────────────────────────────────────"
-
-			lines[#lines + 1] = ""
-
-			local first_line
-
-			-- entries
-			for i = 1, math.min(#old, max) do
+			for i = 1, math.min(#old, max_entries) do
 				local label = (i == 10) and "0" or tostring(i)
-				local path = vim.fn.fnamemodify(old[i], ":~:.")
 				local prefix = "  [" .. label .. "]  "
 
-				-- 文件图标（nvim-web-devicons）
-				local icon_part = ""
-				if has_devicons then
-					local ext = vim.fn.fnamemodify(old[i], ":e")
-					local icon = devicons.get_icon(old[i], ext, { default = true })
-					if icon then
-						icon_part = icon .. " "
-					end
-				end
-
+				local fname = old[i]
+				local path = fn.fnamemodify(fname, ":~:.")
+				local icon, icon_hl = get_icon_cached(fname)
+				local icon_part = icon ~= "" and (icon .. " ") or ""
 				local full_line = prefix .. icon_part .. path
-				lines[#lines + 1] = full_line
 
-				if not first_line then
-					first_line = #lines
-				end
+				table.insert(lines, full_line)
+
+				local lnum = #lines
+				local path_start = #prefix + #icon_part
+				local ps, pe, fe = split_ranges(full_line, path_start)
 
 				entries[#entries + 1] = {
-					line = #lines - 1,
-					label = label,
+					lnum = lnum, -- 1-based 行号
 					full = full_line,
-					raw = old[i],
-					path_start = #prefix + #icon_part,
+					ps = ps, -- path 起始列（0-based）
+					pe = pe, -- path 结束列（0-based，filename 起点）
+					fe = fe, -- filename 结束列
+					icon = icon,
+					icon_col = #prefix, -- icon overlay 列
+					icon_hl = icon_hl,
+					raw = fname,
 				}
 			end
 
-			-- 没有 recent files 时给个提示
 			if #entries == 0 then
-				lines[#lines + 1] = "  (no recent files)"
+				table.insert(lines, "  (no recent files)")
 			end
 
-			-- 底部操作提示
-			lines[#lines + 1] = ""
-			local hint_line = #lines
-			lines[#lines + 1] = "    [1-9,0] Open file · j/k Move · <CR> Current · <Esc> Close"
+			---------------- FOOTER ----------------
+			table.insert(lines, "")
+			local hint_lnum = #lines + 1
+			table.insert(lines, "    [1-9,0] Open file · j/k Move · <CR> Current · <Esc> Close")
 
-			-- write lines
-			vim.api.nvim_buf_set_option(buf, "modifiable", true)
-			vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-			vim.api.nvim_buf_set_option(buf, "modifiable", false)
-			vim.api.nvim_win_set_buf(win, buf)
+			---------------- 写入 BUFFER ----------------
+			api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+			api.nvim_win_set_buf(win, buf)
 
-			-- header highlight
-			for i = 0, #header - 1 do
-				vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesHeader", i, 0, -1)
+			-----------------------------------------------------
+			-- 设置 Dashboard 专用的 buffer 选项
+			-----------------------------------------------------
+			api.nvim_set_option_value("buftype", "nofile", { buf = buf })
+			api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
+			api.nvim_set_option_value("swapfile", false, { buf = buf })
+			api.nvim_set_option_value("modifiable", false, { buf = buf })
+			api.nvim_set_option_value("filetype", "startup-dashboard", { buf = buf })
+
+			---------------- 高亮（用 add_highlight，安全） ----------------
+
+			-- Header 整行
+			for i = 0, header_count - 1 do
+				api.nvim_buf_add_highlight(buf, -1, "OldfilesHeader", i, 0, -1)
 			end
 
-			-- section title highlight
-			vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", section_line, 0, -1)
+			-- Section / Hint 整行
+			api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", section_lnum - 1, 0, -1)
+			api.nvim_buf_add_highlight(buf, -1, "OldfilesHint", hint_lnum - 1, 0, -1)
 
-			-- hint highlight
-			vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesHint", hint_line, 0, -1)
-
-			-- entries highlight
+			-- Entries
+			local ns = api.nvim_create_namespace("StartupDashboard")
 			for _, e in ipairs(entries) do
-				-- index highlight [x]
-				vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesIndex", e.line, 2, 5)
+				local l0 = e.lnum - 1
+				local line = lines[e.lnum] or ""
+				local len = #line
 
-				local ps, pe, fe = split_ranges(e.full, e.path_start)
-				if not pe then
-					-- 全路径
-					vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", e.line, ps, -1)
+				-- [x] 索引
+				api.nvim_buf_add_highlight(buf, -1, "OldfilesIndex", l0, 2, 5)
+
+				-- 路径 / 文件名
+				if not e.pe then
+					-- 没找到文件名（比如 fugitive://），整段当路径
+					api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", l0, e.ps, len)
 				else
-					vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", e.line, ps, pe)
-					vim.api.nvim_buf_add_highlight(buf, -1, "OldfilesFilename", e.line, pe, fe)
+					api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", l0, e.ps, e.pe)
+					api.nvim_buf_add_highlight(buf, -1, "OldfilesFilename", l0, e.pe, e.fe)
+				end
+
+				-- 彩色图标 overlay（使用 devicons 自带 hl_group）
+				if e.icon ~= "" and e.icon_hl then
+					api.nvim_buf_set_extmark(buf, ns, l0, e.icon_col, {
+						virt_text = { { e.icon, e.icon_hl } },
+						virt_text_pos = "overlay",
+						virt_text_hide = true,
+					})
 				end
 			end
 
-			-- cursor at first entry（没有 entries 就不移动光标）
-			if first_line then
-				center_on_index(win, first_line)
+			---------------- 初始光标位置：第一条 entry ----------------
+			if entries[1] then
+				local l = entries[1].lnum
+				local col = (lines[l] or ""):find("%[[0-9]%]") or 0
+				api.nvim_win_set_cursor(win, { l, col })
 			end
 
-			-- keymaps: 数字 -> 对应文件
+			---------------- KEYMAPS ----------------
+
+			-- 数字打开
 			for i, e in ipairs(entries) do
 				local key = (i == 10) and "0" or tostring(i)
 				vim.keymap.set("n", key, function()
@@ -227,38 +303,63 @@ return {
 				end, { buffer = buf, silent = true })
 			end
 
-			-- <CR> 当前行
+			-- <CR> 打开当前行
 			vim.keymap.set("n", "<CR>", function()
-				local line = vim.api.nvim_get_current_line()
+				local line = api.nvim_get_current_line()
 				local key = line:match("%[(%d)%]")
-				if key then
-					local idx = (key == "0") and 10 or tonumber(key)
-					local e = entries[idx]
-					if e then
-						open_oldfile(e.raw)
-					end
+				if not key then
+					return
+				end
+				local idx = (key == "0") and 10 or tonumber(key)
+				local e = entries[idx]
+				if e then
+					open_oldfile(e.raw)
 				end
 			end, { buffer = buf, silent = true })
 
-			-- j/k：移动并保持光标在 [digit] 中间
+			-- j / k 循环移动
 			vim.keymap.set("n", "j", function()
 				move_delta(1)
 			end, { buffer = buf, silent = true })
-
 			vim.keymap.set("n", "k", function()
 				move_delta(-1)
 			end, { buffer = buf, silent = true })
 
-			-- 关闭 dashboard
+			-- 关闭
 			vim.keymap.set("n", "<Esc>", "<cmd>bd!<cr>", { buffer = buf, silent = true })
-		end
 
-		if vim.fn.argc() == 0 and vim.api.nvim_buf_get_name(0) == "" then
-			if not vim.tbl_contains(vim.opt.shortmess:get(), "I") then
-				vim.opt.shortmess:append("I")
+			-- 在 dashboard buffer 里 “透传” i/o/a/...：
+			-- 先 bd! 关闭 dashboard，再在新 buffer 里执行原本的命令
+			local function map_pass_through(key)
+				vim.keymap.set("n", key, function()
+					-- 记录 count（3i、2o 等），如果不关心可以去掉这几行
+					local count = vim.v.count
+					local seq = (count > 0 and tostring(count) or "") .. key
+
+					-- 先关闭当前 dashboard buffer
+					vim.cmd("bd!")
+
+					-- 把原始按键序列送到新的当前 buffer
+					local term = vim.api.nvim_replace_termcodes(seq, true, false, true)
+					vim.api.nvim_feedkeys(term, "n", false)
+				end, { buffer = buf, silent = true })
+			end
+
+			for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "c", "C", "r", "R" }) do
+				map_pass_through(key)
 			end
 		end
 
-		vim.api.nvim_create_autocmd("VimEnter", { callback = render, once = true })
+		-----------------------------------------------------
+		-- 启动自动显示
+		-----------------------------------------------------
+		api.nvim_create_autocmd("VimEnter", {
+			once = true,
+			callback = function()
+				if fn.argc() == 0 and api.nvim_buf_get_name(0) == "" then
+					render(10)
+				end
+			end,
+		})
 	end,
 }
