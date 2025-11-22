@@ -78,10 +78,7 @@ return {
 		-----------------------------------------------------
 		local function is_local_path(path)
 			-- 匹配 xxx:// 开头的路径，如 fugitive://, term://, http:// 等
-			if path:match("^%w[%w+.-]*://") then
-				return false
-			end
-			return true
+			return not path:match("^%w[%w+.-]*://")
 		end
 
 		-----------------------------------------------------
@@ -117,62 +114,51 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- 查找所有 entry 行（形如 "  [1]  ..."）
-		-----------------------------------------------------
-		local function get_entry_lines(buf)
-			local total = api.nvim_buf_line_count(buf)
-			local list = {}
-			for l = 1, total do
-				local text = api.nvim_buf_get_lines(buf, l - 1, l, false)[1]
-				if text and text:match("^%s*%[[0-9]%]") then
-					table.insert(list, l)
-				end
-			end
-			return list
-		end
-
-		-----------------------------------------------------
 		-- j / k：只在 entry 行之间循环移动
 		-----------------------------------------------------
 		local function move_delta(delta)
 			local win = api.nvim_get_current_win()
 			local buf = api.nvim_win_get_buf(win)
 
-			local entry_lines = get_entry_lines(buf)
-			if #entry_lines == 0 then
+			local ok, entries = pcall(api.nvim_buf_get_var, buf, "startup_entries")
+			if not ok or not entries or #entries == 0 then
 				return
 			end
 
-			local pos = api.nvim_win_get_cursor(win)
-			local line = pos[1]
+			-- 当前行号
+			local cur_line = api.nvim_win_get_cursor(win)[1]
 
+			-- 找当前行对应的 entry 下标
 			local cur_idx
-			for i, l in ipairs(entry_lines) do
-				if l == line then
+			for i, e in ipairs(entries) do
+				if e.lnum == cur_line then
 					cur_idx = i
 					break
 				end
 			end
 
+			-- 计算目标下标（循环）
+			local total = #entries
 			if not cur_idx then
-				cur_idx = delta > 0 and 1 or #entry_lines
+				cur_idx = (delta > 0) and 1 or total
 			else
 				if delta > 0 then
-					cur_idx = (cur_idx % #entry_lines) + 1
+					cur_idx = (cur_idx % total) + 1
 				else
-					cur_idx = (cur_idx - 2 + #entry_lines) % #entry_lines + 1
+					cur_idx = (cur_idx - 2 + total) % total + 1
 				end
 			end
 
-			local target = entry_lines[cur_idx]
-			api.nvim_win_set_cursor(win, { target, 0 })
+			local target_entry = entries[cur_idx]
+			local target_line = target_entry.lnum
 
-			-- 让光标落在数字上
-			local line_text = api.nvim_buf_get_lines(buf, target - 1, target, false)[1]
-			local l = line_text and line_text:find("%[[0-9]%]")
-			if l then
-				api.nvim_win_set_cursor(win, { target, l })
-			end
+			-- 先把光标移到行首
+			api.nvim_win_set_cursor(win, { target_line, 0 })
+
+			-- 再把光标对齐到 [x]
+			local line_text = api.nvim_buf_get_lines(buf, target_line - 1, target_line, false)[1]
+			local col = line_text and line_text:find("%[[0-9]%]") or 0
+			api.nvim_win_set_cursor(win, { target_line, col })
 		end
 
 		-----------------------------------------------------
@@ -186,21 +172,39 @@ return {
 			[[   |_| \_| |_|  \___| /_/\_\ |_| |_| |_|     |___/   |_| \_|  \___|  \___/    \_/   |_| |_| |_| |_|   ]],
 		}
 
+		local function get_filtered_oldfiles(max_entries)
+			local seen = {}
+			local result = {}
+			for _, fname in ipairs(vim.v.oldfiles or {}) do
+				if #result >= max_entries then
+					break
+				end
+				if not seen[fname] and is_local_path(fname) and fn.filereadable(fname) == 1 then
+					seen[fname] = true
+					table.insert(result, fname)
+				end
+			end
+			return result
+		end
+
+		local ns = api.nvim_create_namespace("StartupDashboard")
+
+		setup_hl()
+		local augroup = api.nvim_create_augroup("StartupDashboardHighlight", {})
+		api.nvim_create_autocmd("ColorScheme", {
+			group = augroup,
+			callback = setup_hl,
+		})
+
 		-----------------------------------------------------
 		-- 主渲染函数
 		-----------------------------------------------------
 		local function render(max_entries)
 			max_entries = max_entries or 10
 
-			local old = vim.v.oldfiles or {}
+			local old = get_filtered_oldfiles(max_entries)
 			local buf = api.nvim_create_buf(false, true)
 			local win = api.nvim_get_current_win()
-
-			setup_hl()
-			api.nvim_create_autocmd("ColorScheme", {
-				buffer = buf,
-				callback = setup_hl,
-			})
 
 			local lines = {}
 
@@ -222,40 +226,33 @@ return {
 			local label_index = 1
 
 			for _, fname in ipairs(old) do
-				if label_index > max_entries then
-					break
-				end
+				local label = (label_index == 10) and "0" or tostring(label_index)
+				local prefix = "  [" .. label .. "]  "
 
-				-- 跳过虚拟 URI（fugitive:// 等）
-				if is_local_path(fname) then
-					local label = (label_index == 10) and "0" or tostring(label_index)
-					local prefix = "  [" .. label .. "]  "
+				local path = fn.fnamemodify(fname, ":~:.")
+				local icon, icon_hl = get_icon_cached(fname)
+				local icon_part = icon ~= "" and (icon .. " ") or ""
+				local full_line = prefix .. icon_part .. path
 
-					local path = fn.fnamemodify(fname, ":~:.")
-					local icon, icon_hl = get_icon_cached(fname)
-					local icon_part = icon ~= "" and (icon .. " ") or ""
-					local full_line = prefix .. icon_part .. path
+				table.insert(lines, full_line)
 
-					table.insert(lines, full_line)
+				local lnum = #lines
+				local path_start = #prefix + #icon_part
+				local ps, pe, fe = split_ranges(full_line, path_start)
 
-					local lnum = #lines
-					local path_start = #prefix + #icon_part
-					local ps, pe, fe = split_ranges(full_line, path_start)
+				entries[#entries + 1] = {
+					lnum = lnum,
+					full = full_line,
+					ps = ps,
+					pe = pe,
+					fe = fe,
+					icon = icon,
+					icon_col = #prefix,
+					icon_hl = icon_hl,
+					raw = fname,
+				}
 
-					entries[#entries + 1] = {
-						lnum = lnum, -- 1-based 行号
-						full = full_line,
-						ps = ps, -- path 起始列（0-based）
-						pe = pe, -- path 结束列（0-based，filename 起点）
-						fe = fe, -- filename 结束列
-						icon = icon,
-						icon_col = #prefix, -- icon overlay 列
-						icon_hl = icon_hl,
-						raw = fname,
-					}
-
-					label_index = label_index + 1
-				end
+				label_index = label_index + 1
 			end
 
 			if #entries == 0 then
@@ -270,6 +267,10 @@ return {
 			---------------- 写入 BUFFER ----------------
 			api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 			api.nvim_win_set_buf(win, buf)
+			api.nvim_buf_set_name(buf, "startup-dashboard")
+
+			-- 把 entries 存到 buffer 变量上，方便其他函数拿
+			api.nvim_buf_set_var(buf, "startup_entries", entries)
 
 			-----------------------------------------------------
 			-- 设置 Dashboard 专用的 buffer 选项
@@ -292,7 +293,6 @@ return {
 			api.nvim_buf_add_highlight(buf, -1, "OldfilesHint", hint_lnum - 1, 0, -1)
 
 			-- Entries
-			local ns = api.nvim_create_namespace("StartupDashboard")
 			for _, e in ipairs(entries) do
 				local l0 = e.lnum - 1
 				local line = lines[e.lnum] or ""
@@ -360,7 +360,9 @@ return {
 			end, { buffer = buf, silent = true })
 
 			-- 关闭
-			vim.keymap.set("n", "<Esc>", "<cmd>bd!<cr>", { buffer = buf, silent = true })
+			for _, key in ipairs({ "<Esc>", "q" }) do
+				vim.keymap.set("n", key, "<cmd>bd!<cr>", { buffer = buf, silent = true })
+			end
 
 			-- 在 dashboard buffer 里 “透传” i/o/a/...：
 			-- 先 bd! 关闭 dashboard，再在新 buffer 里执行原本的命令
@@ -391,7 +393,7 @@ return {
 			once = true,
 			callback = function()
 				if fn.argc() == 0 and api.nvim_buf_get_name(0) == "" then
-					render(10)
+					render()
 				end
 			end,
 		})
