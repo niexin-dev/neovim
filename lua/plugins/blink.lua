@@ -87,6 +87,18 @@ return {
 					module = "codeium.blink",
 					score_offset = 100,
 					async = true,
+					-- ⬇⬇⬇ 新增：在无名 buffer / 特殊 buftype 里禁用 codeium
+					enabled = function(ctx)
+						local bufnr = ctx and ctx.bufnr or vim.api.nvim_get_current_buf()
+						local name = vim.api.nvim_buf_get_name(bufnr)
+						if name == nil or name == "" then
+							return false
+						end
+
+						-- 可选：只在普通文件里启用（避免在 help / quickfix 里请求）
+						local bt = vim.bo[bufnr].buftype
+						return bt == "" -- normal buffers only
+					end,
 				},
 				cmdline = {
 					-- 在执行 shell 命令时忽略命令行补全
