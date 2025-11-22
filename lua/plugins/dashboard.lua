@@ -74,16 +74,40 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- 打开文件并 cd 到 git root
+		-- 判断是否为本地文件路径（排除 fugitive:// 等虚拟 URI）
+		-----------------------------------------------------
+		local function is_local_path(path)
+			-- 匹配 xxx:// 开头的路径，如 fugitive://, term://, http:// 等
+			if path:match("^%w[%w+.-]*://") then
+				return false
+			end
+			return true
+		end
+
+		-----------------------------------------------------
+		-- 打开文件并 cd 到 git root（仅处理本地文件）
 		-----------------------------------------------------
 		local function open_oldfile(path)
 			if not path or path == "" then
 				return
 			end
+
+			-- 虚拟 URI（fugitive://、term:// 等）直接忽略
+			if not is_local_path(path) then
+				return
+			end
+
 			local dir = fn.fnamemodify(path, ":p:h")
+
+			-- 目录不存在就不要 cd，直接试着打开文件
+			if dir == "" or fn.isdirectory(dir) == 0 then
+				vim.cmd.edit(fn.fnameescape(path))
+				return
+			end
+
 			local root = fn.systemlist({ "git", "-C", dir, "rev-parse", "--show-toplevel" })[1]
 
-			if vim.v.shell_error == 0 and root and root ~= "" then
+			if vim.v.shell_error == 0 and root and root ~= "" and fn.isdirectory(root) == 1 then
 				vim.cmd("cd " .. fn.fnameescape(root))
 			else
 				vim.cmd("cd " .. fn.fnameescape(dir))
@@ -195,33 +219,43 @@ return {
 
 			---------------- ENTRIES ----------------
 			local entries = {}
-			for i = 1, math.min(#old, max_entries) do
-				local label = (i == 10) and "0" or tostring(i)
-				local prefix = "  [" .. label .. "]  "
+			local label_index = 1
 
-				local fname = old[i]
-				local path = fn.fnamemodify(fname, ":~:.")
-				local icon, icon_hl = get_icon_cached(fname)
-				local icon_part = icon ~= "" and (icon .. " ") or ""
-				local full_line = prefix .. icon_part .. path
+			for _, fname in ipairs(old) do
+				if label_index > max_entries then
+					break
+				end
 
-				table.insert(lines, full_line)
+				-- 跳过虚拟 URI（fugitive:// 等）
+				if is_local_path(fname) then
+					local label = (label_index == 10) and "0" or tostring(label_index)
+					local prefix = "  [" .. label .. "]  "
 
-				local lnum = #lines
-				local path_start = #prefix + #icon_part
-				local ps, pe, fe = split_ranges(full_line, path_start)
+					local path = fn.fnamemodify(fname, ":~:.")
+					local icon, icon_hl = get_icon_cached(fname)
+					local icon_part = icon ~= "" and (icon .. " ") or ""
+					local full_line = prefix .. icon_part .. path
 
-				entries[#entries + 1] = {
-					lnum = lnum, -- 1-based 行号
-					full = full_line,
-					ps = ps, -- path 起始列（0-based）
-					pe = pe, -- path 结束列（0-based，filename 起点）
-					fe = fe, -- filename 结束列
-					icon = icon,
-					icon_col = #prefix, -- icon overlay 列
-					icon_hl = icon_hl,
-					raw = fname,
-				}
+					table.insert(lines, full_line)
+
+					local lnum = #lines
+					local path_start = #prefix + #icon_part
+					local ps, pe, fe = split_ranges(full_line, path_start)
+
+					entries[#entries + 1] = {
+						lnum = lnum, -- 1-based 行号
+						full = full_line,
+						ps = ps, -- path 起始列（0-based）
+						pe = pe, -- path 结束列（0-based，filename 起点）
+						fe = fe, -- filename 结束列
+						icon = icon,
+						icon_col = #prefix, -- icon overlay 列
+						icon_hl = icon_hl,
+						raw = fname,
+					}
+
+					label_index = label_index + 1
+				end
 			end
 
 			if #entries == 0 then
