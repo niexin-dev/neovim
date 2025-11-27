@@ -225,7 +225,7 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- 按 git root 分组
+		-- 按 git root 分组：当前所在仓库的分组排在最前面
 		-----------------------------------------------------
 		local function group_files_by_root(files)
 			local grouped = {}
@@ -240,6 +240,35 @@ return {
 				end
 				table.insert(grouped[key], fname)
 			end
+
+			-- 当前工作目录所在的 git 仓库 root
+			local cwd = fn.getcwd()
+			local cwd_root = find_git_root(cwd)
+
+			if cwd_root then
+				-- 规范化成绝对路径，避免 ~、结尾 / 等差异
+				local cwd_root_abs = fn.fnamemodify(cwd_root, ":p")
+				local matched_key = nil
+
+				for _, key in ipairs(order) do
+					if fn.fnamemodify(key, ":p") == cwd_root_abs then
+						matched_key = key
+						break
+					end
+				end
+
+				-- 找到了对应分组，就把它挪到最前面
+				if matched_key then
+					local new_order = { matched_key }
+					for _, key in ipairs(order) do
+						if key ~= matched_key then
+							table.insert(new_order, key)
+						end
+					end
+					order = new_order
+				end
+			end
+
 			return grouped, order
 		end
 
