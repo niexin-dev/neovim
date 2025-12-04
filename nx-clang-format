@@ -1,24 +1,30 @@
-BasedOnStyle: LLVM  # 以 LLVM 风格为基础，再覆盖下面的参数，避免从零配置
+BasedOnStyle: LLVM        # 基于 LLVM 默认风格，再按下列规则覆盖
 
-IndentWidth: 4      # 每一层缩进使用 4 个空格（不使用 2/8）
+# ---- 缩进与空格 ----
+IndentWidth: 4            # 每层缩进使用 4 空格
+UseTab: Never             # 禁止 Tab，统一空格缩进
 
-UseTab: Never       # 禁止使用 Tab，所有缩进统一使用空格格式化
+# ---- 括号与代码块风格 ----
+BreakBeforeBraces: Linux  # Linux 风格：函数的 { 换行，控制语句同行
+BraceWrapping:
+  AfterFunction: true     # 函数声明/定义后的 { 必须换行
 
-BreakBeforeBraces: Linux   # Linux 风格大括号规则：
-                           # - 函数 { 换行
-                           # - if/else/for/while/switch 的 { 与语句同行
+# ---- 控制语句格式化规则 ----
+SpaceAfterControlStatementKeyword: true   # 格式为 if (x) / while (x)，而不是 if(x)
 
-IndentCaseLabels: false    # case 不额外缩进，保持与 switch 对齐（Linux/嵌入式推荐）
+AllowShortIfStatementsOnASingleLine: false     # 禁止短 if 写成单行
+AllowShortLoopsOnASingleLine: false            # 禁止 while / for 单行写法
+AllowShortBlocksOnASingleLine: false           # 禁止 {...} 单行格式
+AllowShortFunctionsOnASingleLine: None         # 禁止短函数写成一行
 
-ColumnLimit: 120           # 单行字符限制为 120，不强制换行（更适合现代宽屏和中文注释）
+# ---- switch-case ----
+IndentCaseLabels: false              # case 与 switch 对齐，不额外缩进
+AllowShortCaseLabelsOnASingleLine: false   # case 语句禁止写成一行（例如 case A: foo(); break;）
 
-AllowShortIfStatementsOnASingleLine: false  
-                           # 不允许单行 if，例如禁止格式： if (x) return 1;
-                           # 格式化后强制采用块结构：
-                           # if (x) {
-                           #     return 1;
-                           # }
+# ---- 代码布局 ----
+ColumnLimit: 120            # 单行最大长度，不强制换行
 
-SpaceAfterControlStatementKeyword: true     
-                           # 控制语句关键字后加空格，例如： if (x) 而不是 if(x)
+# ---- 其他规则 ----
+SortIncludes: false         # 不自动排序 include（避免破坏依赖顺序）
+AlignTrailingComments: false   # 禁止对齐尾部注释（保持自然输入格式）
 
