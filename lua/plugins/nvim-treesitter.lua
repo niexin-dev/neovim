@@ -2,12 +2,14 @@ return {
 	{
 		"nvim-treesitter/nvim-treesitter",
 		dependencies = {
-			"nvim-treesitter/nvim-treesitter-textobjects", -- 确保安装了textobjects插件
+			"nvim-treesitter/nvim-treesitter-textobjects",
 		},
-		event = { "BufReadPre", "BufNewFile" },
+		-- 建议改成 BufReadPost，这样保证文件读完再建语法树
+		event = { "BufReadPost", "BufNewFile" },
 		build = ":TSUpdate",
 		opts = {
 			highlight = { enable = true },
+			-- indent 有时候会和 C/C++ 的缩进习惯冲突，你可以按需开启
 			-- indent = { enable = true },
 			ensure_installed = {
 				"bash",
@@ -51,7 +53,11 @@ return {
 						["]c"] = "@class.outer",
 						["]a"] = "@parameter.inner",
 					},
-					goto_next_end = { ["]F"] = "@function.outer", ["]C"] = "@class.outer", ["]A"] = "@parameter.inner" },
+					goto_next_end = {
+						["]F"] = "@function.outer",
+						["]C"] = "@class.outer",
+						["]A"] = "@parameter.inner",
+					},
 					goto_previous_start = {
 						["[f"] = "@function.outer",
 						["[c"] = "@class.outer",
@@ -78,9 +84,12 @@ return {
 			require("nvim-treesitter.configs").setup(opts)
 		end,
 	},
+
 	{
 		"nvim-treesitter/nvim-treesitter-context",
-		event = "VeryLazy",
+		dependencies = { "nvim-treesitter/nvim-treesitter" }, -- 确保顺序正确
+		-- 这里我给你改成文件读完后再加载，比 VeryLazy 更「跟着文件走」
+		event = "BufReadPost",
 		opts = {
 			enable = true,
 			multiwindow = false,

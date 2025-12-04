@@ -153,3 +153,18 @@ vim.opt.completeopt = "menu,menuone,noselect"
 
 -- 更好的搜索体验
 vim.opt.inccommand = "split" -- 实时预览替换效果
+
+-- 关闭 netrw（用 neo-tree/其他替代）
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
+
+-- 关闭 matchit（用不到就关）
+vim.g.loaded_matchit = 1
+
+-- 关闭 tar/zip 支持（你用不到的话）
+vim.g.loaded_tarPlugin = 1
+vim.g.loaded_zipPlugin = 1
+
+-- 关闭 tutor
+vim.g.loaded_tutor_mode_plugin = 1
+
