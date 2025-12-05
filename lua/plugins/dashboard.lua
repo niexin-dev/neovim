@@ -207,20 +207,38 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- oldfiles 过滤
+		-- oldfiles 过滤：总共 max_entries，每个 git root 最多 per_root_limit 个
 		-----------------------------------------------------
-		local function get_filtered_oldfiles(max_entries)
-			local seen = {}
+		local function get_filtered_oldfiles(max_entries, per_root_limit)
+			max_entries = max_entries or 10
+			per_root_limit = per_root_limit or 2
+
+			local seen = {} -- 去重：绝对路径
+			local per_root_count = {} -- 每个 git root 已选数量
 			local result = {}
+
 			for _, fname in ipairs(vim.v.oldfiles or {}) do
 				if #result >= max_entries then
 					break
 				end
-				if not seen[fname] and is_local_path(fname) and fn.filereadable(fname) == 1 then
-					seen[fname] = true
-					table.insert(result, fname)
+
+				if is_local_path(fname) and fn.filereadable(fname) == 1 then
+					-- 规范化路径，避免同一文件不同写法（相对/绝对/~）重复
+					local abspath = fn.fnamemodify(fname, ":p")
+					if not seen[abspath] then
+						local root = find_git_root(abspath)
+						local key = root or "OTHER"
+
+						local cnt = per_root_count[key] or 0
+						if cnt < per_root_limit then
+							per_root_count[key] = cnt + 1
+							seen[abspath] = true
+							table.insert(result, fname) -- 保留原始路径，后面还会再做 :~:. 处理
+						end
+					end
 				end
 			end
+
 			return result
 		end
 
@@ -278,7 +296,7 @@ return {
 		local function render(max_entries)
 			max_entries = max_entries or 10
 
-			local old = get_filtered_oldfiles(max_entries)
+			local old = get_filtered_oldfiles(max_entries, 2)
 			local buf = api.nvim_create_buf(false, true)
 			local win = api.nvim_get_current_win()
 			local lines = {}
