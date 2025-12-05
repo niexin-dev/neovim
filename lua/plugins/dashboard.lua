@@ -10,11 +10,24 @@ return {
 		local uv = vim.loop
 
 		-----------------------------------------------------
+		-- 用户选项
+		-----------------------------------------------------
+		-- 是否启用文件类型图标（依赖 nvim-web-devicons）
+		-- true  = 显示图标（视觉效果好，略慢一点）
+		-- false = 不显示图标（更快，纯文本）
+		local USE_ICONS = true
+
+		-----------------------------------------------------
 		-- 常量 / 高亮颜色
 		-----------------------------------------------------
 		local NO_GIT_ROOT = false
 
-		local has_devicons, devicons = pcall(require, "nvim-web-devicons")
+		-- 只有在启用图标时才加载 devicons，避免不必要的开销
+		local has_devicons, devicons = false, nil
+		if USE_ICONS then
+			has_devicons, devicons = pcall(require, "nvim-web-devicons")
+		end
+
 		local ok_colors, tn_colors = pcall(function()
 			return require("tokyonight.colors").setup()
 		end)
@@ -59,20 +72,40 @@ return {
 		})
 
 		-----------------------------------------------------
-		-- 图标缓存
+		-- 图标缓存（可开关）
 		-----------------------------------------------------
 		local icon_cache = {}
+
 		local function get_icon_cached(fname)
-			if not has_devicons then
+			-- 图标关闭：直接返回空
+			if not USE_ICONS then
 				return "", nil
 			end
+
+			-- devicons 是否存在、是否是 table、是否提供 get_icon 方法
+			if not has_devicons or type(devicons) ~= "table" or type(devicons.get_icon) ~= "function" then
+				return "", nil
+			end
+
+			-- 缓存已经存在
 			if icon_cache[fname] then
 				return icon_cache[fname].icon, icon_cache[fname].hl
 			end
+
+			-- 计算扩展名
 			local ext = fn.fnamemodify(fname, ":e")
+
+			-- 调用 devicons（可能返回 nil）
 			local icon, hl = devicons.get_icon(fname, ext, { default = true })
-			icon_cache[fname] = { icon = icon or "", hl = hl }
-			return icon_cache[fname].icon, icon_cache[fname].hl
+
+			-- 防止 nil 引发报错
+			icon = icon or ""
+			hl = hl or nil -- hl 可以是 nil，不影响后续
+
+			-- 写入缓存
+			icon_cache[fname] = { icon = icon, hl = hl }
+
+			return icon, hl
 		end
 
 		-----------------------------------------------------
@@ -340,7 +373,7 @@ return {
 
 					local path = fn.fnamemodify(fname, ":~:.")
 					local icon, icon_hl = get_icon_cached(fname)
-					local icon_part = icon ~= "" and (icon .. " ") or ""
+					local icon_part = (USE_ICONS and icon ~= "") and (icon .. " ") or ""
 					local full_line = prefix .. icon_part .. path
 
 					table.insert(lines, full_line)
@@ -413,7 +446,8 @@ return {
 					api.nvim_buf_add_highlight(buf, -1, "OldfilesFilename", l0, e.pe, e.fe)
 				end
 
-				if e.icon ~= "" and e.icon_hl then
+				-- 图标 overlay 也受 USE_ICONS 控制
+				if USE_ICONS and e.icon ~= "" and e.icon_hl then
 					api.nvim_buf_set_extmark(buf, ns, l0, e.icon_col, {
 						virt_text = { { e.icon, e.icon_hl } },
 						virt_text_pos = "overlay",
