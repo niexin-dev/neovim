@@ -24,6 +24,7 @@ return {
 		local USE_ICONS = true -- 是否启用文件类型图标（依赖 nvim-web-devicons）
 		local MAX_ROOTS = 10 -- 最多显示多少个 git 仓库
 		local PER_ROOT_FILES = 5 -- 每个仓库展示的最大文件数
+		local MAX_OLDFILES_SCAN = 100 -- 最高只扫描最近 300 条 oldfiles，加速启动
 
 		-----------------------------------------------------
 		-- 颜色 & 高亮定义
@@ -227,17 +228,27 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- 从 vim.v.oldfiles 中筛掉：
-		--   - 非本地路径
-		--   - 文件已不存在 / 不可读
+		-- 从 vim.v.oldfiles 中筛选有效文件：
+		--   - 只扫描前 MAX_OLDFILES_SCAN 条（性能优化）
+		--   - 过滤掉不可读或非本地路径
 		-----------------------------------------------------
 		local function get_valid_oldfiles()
 			local result = {}
+			local count = 0
+
 			for _, fname in ipairs(vim.v.oldfiles or {}) do
+				count = count + 1
+
+				-- 性能优化：限制最多扫描多少条 oldfiles
+				if count > MAX_OLDFILES_SCAN then
+					break
+				end
+
 				if is_local_path(fname) and fn.filereadable(fname) == 1 then
 					table.insert(result, fname)
 				end
 			end
+
 			return result
 		end
 
@@ -626,7 +637,7 @@ return {
 		-- 自动在 VimEnter 时显示 dashboard：
 		--   - 仅在「不带参数启动」且「当前 buffer 为空」时生效
 		-----------------------------------------------------
-		api.nvim_create_autocmd("VimEnter", {
+		api.nvim_create_autocmd("UIEnter", {
 			once = true,
 			callback = function()
 				if fn.argc() == 0 and api.nvim_buf_get_name(0) == "" then
