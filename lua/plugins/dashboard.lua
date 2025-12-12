@@ -634,6 +634,20 @@ return {
 		end
 
 		-----------------------------------------------------
+		-- 用户命令：手动打开 dashboard
+		--   :Dashboard  像启动时一样，在当前窗口打开 dashboard
+		-----------------------------------------------------
+		api.nvim_create_user_command("Dashboard", function()
+			render()
+		end, {
+			desc = "Open custom startup dashboard",
+		})
+
+		-- 可选：给个全局快捷键
+		vim.keymap.set("n", "<leader>fd", "<cmd>Dashboard<CR>", {
+			desc = "Open startup dashboard",
+		})
+		-----------------------------------------------------
 		-- 自动在 VimEnter 时显示 dashboard：
 		--   - 仅在「不带参数启动」且「当前 buffer 为空」时生效
 		-----------------------------------------------------
