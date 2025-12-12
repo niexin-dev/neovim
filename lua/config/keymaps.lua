@@ -61,11 +61,11 @@ vim.keymap.set("n", "<leader>w", "<cmd>w<CR>", { desc = "Save file", silent = tr
 vim.keymap.set("t", "<C-j>", [[<C-\><C-n>]], { noremap = true, silent = true })
 
 ----------------------------------------------------------------------
--- <leader>ta: 创建终端
+-- <leader>tn: 创建终端
 --  - 如果已经有终端窗口：在“最后一个终端”的右边再创建一个终端（vsplit）
 --  - 如果还没有终端窗口：在当前 buffer 下方创建一个终端
 ----------------------------------------------------------------------
-vim.keymap.set("n", "<leader>to", function()
+vim.keymap.set("n", "<leader>tn", function()
 	local last_term_win = nil
 
 	-- 找到当前所有终端窗口中“最后一个”
@@ -86,16 +86,15 @@ vim.keymap.set("n", "<leader>to", function()
 		-- 没有终端：保持原来的行为，在当前 buffer 下方开一个终端
 		vim.cmd("belowright split | terminal")
 	end
-end, { noremap = true, silent = true, desc = "Open terminal" })
+end, { noremap = true, silent = true, desc = "New terminal" })
 
 ----------------------------------------------------------------------
-----------------------------------------------------------------------
--- <leader>th: 智能 Toggle Terminal（显示/隐藏/新建）
+-- <leader>ta: 智能 Toggle Terminal（显示/隐藏/新建）
 ----------------------------------------------------------------------
 -- 保存“被隐藏终端”的 buffer 列表
 local hidden_term_buffers = {}
 
-vim.keymap.set("n", "<leader>th", function()
+vim.keymap.set("n", "<leader>ta", function()
 	local term_wins = {} -- 当前显示中的终端窗口
 	local term_bufs = {} -- 当前显示中的终端 buffer
 	local has_term_shown = false
@@ -129,14 +128,23 @@ vim.keymap.set("n", "<leader>th", function()
 	-- 情况 2：当前没有终端，但之前隐藏过 → 重新显示它们
 	------------------------------------------------------------------
 	if #hidden_term_buffers > 0 then
+		local first = true
 		for _, buf in ipairs(hidden_term_buffers) do
 			if vim.api.nvim_buf_is_valid(buf) then
-				-- 在下方 split 打开并显示此终端 buffer
-				vim.cmd("belowright split")
+				if first then
+					-- 第一个终端：在当前 buffer 下方
+					vim.cmd("belowright split")
+					first = false
+				else
+					-- 后续终端：在当前终端右边开 vsplit
+					vim.cmd("vsplit")
+				end
 				vim.api.nvim_win_set_buf(0, buf)
+				-- 如果你想恢复后直接输入，加这一句：
+				vim.cmd("startinsert")
 			end
 		end
-		hidden_term_buffers = {} -- 重置
+		hidden_term_buffers = {}
 		return
 	end
 
@@ -145,3 +153,44 @@ vim.keymap.set("n", "<leader>th", function()
 	------------------------------------------------------------------
 	vim.cmd("belowright split | terminal")
 end, { noremap = true, silent = true, desc = "Toggle terminal" })
+
+vim.api.nvim_create_autocmd("TermOpen", {
+	callback = function()
+		vim.cmd("startinsert")
+	end,
+})
+
+-- 用 tab 模拟“最大化当前窗口”的 toggle
+local zoom_tabpage = nil
+
+vim.keymap.set("n", "<leader>m", function()
+	local current_tab = vim.api.nvim_get_current_tabpage()
+	local wins = vim.api.nvim_tabpage_list_wins(current_tab)
+
+	--------------------------------------------------------------------
+	-- 如果只有 1 个窗口，则不进行 zoom（保持静默）
+	--------------------------------------------------------------------
+	if #wins == 1 and zoom_tabpage == nil then
+		return
+	end
+
+	--------------------------------------------------------------------
+	-- 进入 zoom 模式
+	--------------------------------------------------------------------
+	if zoom_tabpage == nil then
+		zoom_tabpage = current_tab
+		vim.cmd("tab split") -- 在新 tab 中最大化当前 buffer
+		return
+	end
+
+	--------------------------------------------------------------------
+	-- 退出 zoom 模式
+	--------------------------------------------------------------------
+	if current_tab ~= zoom_tabpage then
+		-- 当前在 zoom tab：关闭它
+		vim.cmd("tabclose") -- 自动切回 zoom_tabpage
+	end
+
+	-- 清除状态
+	zoom_tabpage = nil
+end, { desc = "Toggle maximize current buffer (via tab)" })
