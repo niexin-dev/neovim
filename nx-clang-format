@@ -10,7 +10,7 @@ BraceWrapping:
   AfterFunction: true     # 函数声明/定义后的 { 必须换行
 
 # ---- 控制语句格式化规则 ----
-SpaceAfterControlStatementKeyword: true   # 格式为 if (x) / while (x)，而不是 if(x)
+SpaceAfterControlStatementKeyword: true   # 使用 if (x) / while (x) 形式，而不是 if(x)
 
 AllowShortIfStatementsOnASingleLine: false     # 禁止短 if 写成单行
 AllowShortLoopsOnASingleLine: false            # 禁止 while / for 单行写法
@@ -18,13 +18,15 @@ AllowShortBlocksOnASingleLine: false           # 禁止 {...} 单行格式
 AllowShortFunctionsOnASingleLine: None         # 禁止短函数写成一行
 
 # ---- switch-case ----
-IndentCaseLabels: false              # case 与 switch 对齐，不额外缩进
-AllowShortCaseLabelsOnASingleLine: false   # case 语句禁止写成一行（例如 case A: foo(); break;）
+IndentCaseLabels: false                        # case 与 switch 对齐，不额外缩进
+AllowShortCaseLabelsOnASingleLine: false       # case 语句禁止写成一行（例如 case A: foo(); break;）
+
+# ---- 枚举 ----
+AllowShortEnumsOnASingleLine: false            # 即使枚举很短，也强制使用多行格式
 
 # ---- 代码布局 ----
-ColumnLimit: 120            # 单行最大长度，不强制换行
+ColumnLimit: 120            # 单行最大长度，不强制换行（超过时 clang-format 才考虑拆行）
 
 # ---- 其他规则 ----
 SortIncludes: false         # 不自动排序 include（避免破坏依赖顺序）
 AlignTrailingComments: false   # 禁止对齐尾部注释（保持自然输入格式）
-
