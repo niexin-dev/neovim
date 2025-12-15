@@ -77,12 +77,12 @@ return {
 		prompt_library = {
 			-- 代码解释
 			["Explain Code"] = {
-				strategy = "chat",
+				interaction = "chat",
 				description = "解释选中的代码",
 				opts = {
 					index = 1,
 					is_slash_cmd = true,
-					short_name = "explain",
+					alias = "explain",
 				},
 				prompts = {
 					{
@@ -94,12 +94,12 @@ return {
 			},
 			-- 代码优化
 			["Optimize Code"] = {
-				strategy = "inline",
+				interaction = "inline",
 				description = "优化选中的代码",
 				opts = {
 					index = 2,
 					is_slash_cmd = true,
-					short_name = "opt",
+					alias = "opt",
 				},
 				prompts = {
 					{
@@ -111,12 +111,12 @@ return {
 			},
 			-- 添加注释
 			["Add Comments"] = {
-				strategy = "inline",
+				interaction = "inline",
 				description = "为代码添加注释",
 				opts = {
 					index = 3,
 					is_slash_cmd = true,
-					short_name = "comment",
+					alias = "comment",
 				},
 				prompts = {
 					{
@@ -128,12 +128,12 @@ return {
 			},
 			-- 修复 Bug
 			["Fix Bug"] = {
-				strategy = "chat",
+				interaction = "chat",
 				description = "分析并修复代码中的问题",
 				opts = {
 					index = 4,
 					is_slash_cmd = true,
-					short_name = "fix",
+					alias = "fix",
 				},
 				prompts = {
 					{
@@ -145,12 +145,12 @@ return {
 			},
 			-- 生成测试
 			["Generate Tests"] = {
-				strategy = "chat",
+				interaction = "chat",
 				description = "为代码生成测试用例",
 				opts = {
 					index = 5,
 					is_slash_cmd = true,
-					short_name = "test",
+					alias = "test",
 				},
 				prompts = {
 					{
@@ -162,13 +162,13 @@ return {
 			},
 			-- 名为"Generate a Commit Message"的提示
 			["Generate a Commit Message"] = {
-				strategy = "chat", -- 使用聊天策略
+				interaction = "chat", -- 使用聊天策略
 				description = "Generate a commit message", -- 描述
 				opts = {
 					index = 10, -- 排序位置
 					is_default = true, -- 设为默认提示
 					is_slash_cmd = true, -- 支持斜杠命令
-					short_name = "nxcmt", -- 快捷名称
+					alias = "nxcmt", -- 快捷名称
 					auto_submit = true, -- 自动提交
 				},
 				-- 提示内容定义
