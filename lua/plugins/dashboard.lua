@@ -126,6 +126,15 @@ return {
 		end
 
 		-----------------------------------------------------
+		-- 工具函数：判断是否是 Windows 挂载盘（/mnt/c,/mnt/d,...）
+		-- 仅用于 dashboard 过滤，避免无意义扫描 Windows 盘
+		-----------------------------------------------------
+		local function is_on_windows_mount(path)
+			-- 典型形式：/mnt/c/Users/... /mnt/d/... /mnt/e/...
+			return path:match("^/mnt/[a-zA-Z]/")
+		end
+
+		-----------------------------------------------------
 		-- 查找 git 仓库根目录（带负缓存）
 		-- 从给定 path 一路向上找 .git 目录 / 文件
 		-----------------------------------------------------
@@ -136,6 +145,11 @@ return {
 		---@return string|nil git_root
 		local function find_git_root(path)
 			if not is_local_path(path) then
+				return nil
+			end
+
+			-- ★ 如果是 /mnt/*，直接返回 nil，避免去 Windows 盘爬 .git
+			if is_on_windows_mount(path) then
 				return nil
 			end
 
@@ -231,6 +245,7 @@ return {
 		-- 从 vim.v.oldfiles 中筛选有效文件：
 		--   - 只扫描前 MAX_OLDFILES_SCAN 条（性能优化）
 		--   - 过滤掉不可读或非本地路径
+		--   - 过滤掉位于 /mnt/* 的 Windows 挂载盘文件
 		-----------------------------------------------------
 		local function get_valid_oldfiles()
 			local result = {}
@@ -244,7 +259,11 @@ return {
 					break
 				end
 
-				if is_local_path(fname) and fn.filereadable(fname) == 1 then
+				if
+					is_local_path(fname)
+					and not is_on_windows_mount(fname) -- ★ 新增：过滤 /mnt/*
+					and fn.filereadable(fname) == 1
+				then
 					table.insert(result, fname)
 				end
 			end
