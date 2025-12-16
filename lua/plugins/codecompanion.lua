@@ -23,13 +23,13 @@ return {
 		-- 定义不同策略使用的适配器
 		strategies = {
 			chat = { -- 聊天模式
-				adapter = "gemini", -- 使用deepseek适配器
+				adapter = "ollama",
 			},
 			inline = { -- 行内编辑模式
-				adapter = "gemini",
+				adapter = "ollama",
 			},
 			cmd = { -- 命令行模式
-				adapter = "gemini",
+				adapter = "ollama",
 			},
 		},
 		-- 适配器具体配置
@@ -67,6 +67,18 @@ return {
 						schema = {
 							model = {
 								default = "gpt-4o", -- 默认模型
+							},
+						},
+					})
+				end,
+				ollama = function()
+					return require("codecompanion.adapters").extend("ollama", {
+						env = {
+							url = "http://192.168.5.225:11434",
+						},
+						schema = {
+							model = {
+								default = "qwen3-coder:30b", -- 默认模型
 							},
 						},
 					})
