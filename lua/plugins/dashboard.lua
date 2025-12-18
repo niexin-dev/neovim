@@ -17,6 +17,85 @@ return {
 		local PER_ROOT_FILES = 5
 		local MAX_OLDFILES_SCAN = 100
 
+		-- A) 后台预热 git root（用于 shada 很大/仓库很多时）
+		local PREHEAT_GIT_ROOT = true
+		local PREHEAT_GIT_ROOT_MAX = 200 -- 预热最多多少个文件的 git root
+		local PREHEAT_GIT_ROOT_BATCH = 50 -- 分批处理，避免一次性卡顿
+
+		-- C) Debug/Profiling
+		local DEBUG = false
+
+		-----------------------------------------------------
+		-- Debug/Profiling helpers
+		-----------------------------------------------------
+		local stats = {
+			renders = 0,
+			render_ms_total = 0,
+
+			oldfiles_sig_changes = 0,
+			oldfiles_top_builds = 0,
+			oldfiles_all_builds = 0,
+			oldfiles_top_ms_total = 0,
+			oldfiles_all_ms_total = 0,
+
+			git_root_calls = 0,
+			git_root_file_hit = 0,
+			git_root_dir_hit = 0,
+			git_root_fs_checks = 0,
+			git_root_ms_total = 0,
+
+			preheat_runs = 0,
+			preheat_git_root_runs = 0,
+		}
+
+		local function now_ms()
+			return uv.hrtime() / 1e6
+		end
+
+		local function dbg(msg)
+			if not DEBUG then
+				return
+			end
+			vim.schedule(function()
+				vim.notify(msg, vim.log.levels.INFO, { title = "dashboard" })
+			end)
+		end
+
+		local function print_stats()
+			local avg_render = stats.renders > 0 and (stats.render_ms_total / stats.renders) or 0
+			local avg_git = stats.git_root_calls > 0 and (stats.git_root_ms_total / stats.git_root_calls) or 0
+
+			local msg = table.concat({
+				("renders=%d, render_total=%.1fms, render_avg=%.2fms"):format(
+					stats.renders,
+					stats.render_ms_total,
+					avg_render
+				),
+				("oldfiles_sig_changes=%d"):format(stats.oldfiles_sig_changes),
+				("oldfiles_top_builds=%d, top_total=%.1fms"):format(
+					stats.oldfiles_top_builds,
+					stats.oldfiles_top_ms_total
+				),
+				("oldfiles_all_builds=%d, all_total=%.1fms"):format(
+					stats.oldfiles_all_builds,
+					stats.oldfiles_all_ms_total
+				),
+				("git_root_calls=%d, git_total=%.1fms, git_avg=%.3fms"):format(
+					stats.git_root_calls,
+					stats.git_root_ms_total,
+					avg_git
+				),
+				("git_cache_hit_file=%d, git_cache_hit_dir=%d, git_fs_checks=%d"):format(
+					stats.git_root_file_hit,
+					stats.git_root_dir_hit,
+					stats.git_root_fs_checks
+				),
+				("preheat_runs=%d, preheat_git_root_runs=%d"):format(stats.preheat_runs, stats.preheat_git_root_runs),
+			}, "\n")
+
+			vim.notify(msg, vim.log.levels.INFO, { title = "dashboard stats" })
+		end
+
 		-----------------------------------------------------
 		-- 状态
 		-----------------------------------------------------
@@ -114,33 +193,42 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- git root：目录缓存 + 文件缓存（关键性能提升）
+		-- git root：目录缓存 + 文件缓存
 		-----------------------------------------------------
 		local NO_GIT_ROOT = false
 		local git_root_cache = {} -- dir -> root|NO_GIT_ROOT
 		local file_root_cache = {} -- file(abs) -> root|false
 
 		local function find_git_root(path)
+			stats.git_root_calls = stats.git_root_calls + 1
+			local t0 = now_ms()
+
 			if not path or path == "" then
+				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return nil
 			end
 			if not is_local_path(path) or is_on_windows_mount(path) then
+				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return nil
 			end
 
 			local abspath = fn.fnamemodify(path, ":p")
 			if abspath == "" then
+				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return nil
 			end
 
 			local cached_file = file_root_cache[abspath]
 			if cached_file ~= nil then
+				stats.git_root_file_hit = stats.git_root_file_hit + 1
+				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return cached_file or nil
 			end
 
 			local dir = (fn.isdirectory(abspath) == 1) and abspath or fn.fnamemodify(abspath, ":h")
 			if dir == "" then
 				file_root_cache[abspath] = false
+				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return nil
 			end
 
@@ -151,11 +239,13 @@ return {
 			while cur and cur ~= "" do
 				local cached_dir = git_root_cache[cur]
 				if cached_dir ~= nil then
+					stats.git_root_dir_hit = stats.git_root_dir_hit + 1
 					root = cached_dir ~= NO_GIT_ROOT and cached_dir or nil
 					break
 				end
 
 				table.insert(visited, cur)
+				stats.git_root_fs_checks = stats.git_root_fs_checks + 1
 				if uv.fs_stat(cur .. "/.git") then
 					root = cur
 					break
@@ -174,17 +264,17 @@ return {
 			end
 
 			file_root_cache[abspath] = root or false
+			stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 			return root
 		end
 
 		-----------------------------------------------------
-		-- oldfiles 全量缓存策略 + 后台预热
+		-- oldfiles 缓存策略 + 后台预热
 		-----------------------------------------------------
 		local oldfiles_cache_top = nil
 		local oldfiles_cache_all = nil
 		local oldfiles_sig_cached = nil
 
-		-- 预热调度状态
 		local preheat_scheduled = false
 
 		local function oldfiles_signature(list)
@@ -195,12 +285,10 @@ return {
 			if n == 0 then
 				return "0"
 			end
-
 			local function at(i)
 				local v = list[i]
 				return v or ""
 			end
-
 			local mid = math.floor(n / 2)
 			return table.concat({
 				tostring(n),
@@ -220,8 +308,8 @@ return {
 				oldfiles_sig_cached = sig
 				oldfiles_cache_top = nil
 				oldfiles_cache_all = nil
-				-- oldfiles 变化后，允许重新预热
 				preheat_scheduled = false
+				stats.oldfiles_sig_changes = stats.oldfiles_sig_changes + 1
 			end
 		end
 
@@ -238,6 +326,7 @@ return {
 				end
 			end
 
+			local t0 = now_ms()
 			local result = {}
 			local count = 0
 
@@ -252,38 +341,81 @@ return {
 				end
 			end
 
+			local dt = now_ms() - t0
 			if scan_all then
 				oldfiles_cache_all = result
+				stats.oldfiles_all_builds = stats.oldfiles_all_builds + 1
+				stats.oldfiles_all_ms_total = stats.oldfiles_all_ms_total + dt
 			else
 				oldfiles_cache_top = result
+				stats.oldfiles_top_builds = stats.oldfiles_top_builds + 1
+				stats.oldfiles_top_ms_total = stats.oldfiles_top_ms_total + dt
 			end
 
 			return result
 		end
 
-		-- 后台预热：首次进入 dashboard 后，延迟构建全量缓存
+		-- A) 分批预热 git root（避免一次性卡）
+		local function preheat_git_roots_batch(files)
+			if not PREHEAT_GIT_ROOT then
+				return
+			end
+			if type(files) ~= "table" or #files == 0 then
+				return
+			end
+
+			stats.preheat_git_root_runs = stats.preheat_git_root_runs + 1
+
+			local maxn = math.min(#files, PREHEAT_GIT_ROOT_MAX)
+			local i = 1
+
+			local function step()
+				local end_i = math.min(i + PREHEAT_GIT_ROOT_BATCH - 1, maxn)
+				for j = i, end_i do
+					find_git_root(files[j])
+				end
+				i = end_i + 1
+				if i <= maxn then
+					vim.schedule(step)
+				end
+			end
+
+			vim.schedule(step)
+		end
+
+		-- 后台预热：首次进入 dashboard 后，延迟构建全量缓存 + 可选预填充 git root
 		local function schedule_preheat_all_oldfiles()
 			invalidate_oldfiles_cache_if_needed()
 
-			-- 已有全量缓存 or 已调度，则不重复
 			if oldfiles_cache_all ~= nil or preheat_scheduled then
 				return
 			end
 
 			preheat_scheduled = true
-			vim.schedule(function()
-				-- 执行前再次检查是否需要失效
-				invalidate_oldfiles_cache_if_needed()
+			stats.preheat_runs = stats.preheat_runs + 1
 
-				-- 如果此时已经有缓存（例如用户先展开过），直接跳过
+			vim.schedule(function()
+				invalidate_oldfiles_cache_if_needed()
 				if oldfiles_cache_all ~= nil then
 					return
 				end
 
-				-- 构建全量缓存（这一步是“挪到空闲时做”）
-				pcall(function()
+				-- 构建全量缓存
+				local ok = pcall(function()
 					get_valid_oldfiles_cached(true)
 				end)
+				if not ok then
+					return
+				end
+
+				-- A) 可选：预热 git root（分批）
+				preheat_git_roots_batch(oldfiles_cache_all)
+				dbg(
+					("preheat done: all_oldfiles=%d, preheat_git_root=%s"):format(
+						oldfiles_cache_all and #oldfiles_cache_all or 0,
+						tostring(PREHEAT_GIT_ROOT)
+					)
+				)
 			end)
 		end
 
@@ -591,6 +723,9 @@ return {
 		-- 主渲染：只更新 buffer 内容
 		-----------------------------------------------------
 		local function render()
+			stats.renders = stats.renders + 1
+			local t0 = now_ms()
+
 			local buf = ensure_dashboard_buf()
 			api.nvim_win_set_buf(0, buf)
 			api.nvim_buf_clear_namespace(buf, ns_dashboard, 0, -1)
@@ -741,10 +876,14 @@ return {
 				end
 			end
 
-			-- ★ 未展开时触发“后台预热全量 oldfiles”
+			-- 未展开时触发后台预热（全量 oldfiles + 可选 git root）
 			if expanded_root == nil then
 				schedule_preheat_all_oldfiles()
 			end
+
+			local dt = now_ms() - t0
+			stats.render_ms_total = stats.render_ms_total + dt
+			dbg(("render: expanded=%s, dt=%.2fms"):format(tostring(expanded_root), dt))
 		end
 
 		-----------------------------------------------------
@@ -753,6 +892,16 @@ return {
 		api.nvim_create_user_command("Dashboard", function()
 			render()
 		end, { desc = "Open startup dashboard" })
+
+		-- C) stats & debug toggle
+		api.nvim_create_user_command("DashboardStats", function()
+			print_stats()
+		end, { desc = "Show dashboard profiling stats" })
+
+		api.nvim_create_user_command("DashboardDebugToggle", function()
+			DEBUG = not DEBUG
+			vim.notify(("dashboard DEBUG=%s"):format(tostring(DEBUG)), vim.log.levels.INFO, { title = "dashboard" })
+		end, { desc = "Toggle dashboard debug logs" })
 
 		vim.keymap.set("n", "<leader>fd", "<cmd>Dashboard<CR>", { desc = "Open startup dashboard" })
 
