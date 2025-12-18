@@ -46,6 +46,9 @@ return {
 
 			preheat_runs = 0,
 			preheat_git_root_runs = 0,
+
+			abs_cache_hit = 0,
+			abs_cache_miss = 0,
 		}
 
 		local function now_ms()
@@ -91,6 +94,7 @@ return {
 					stats.git_root_fs_checks
 				),
 				("preheat_runs=%d, preheat_git_root_runs=%d"):format(stats.preheat_runs, stats.preheat_git_root_runs),
+				("abs_cache_hit=%d, abs_cache_miss=%d"):format(stats.abs_cache_hit, stats.abs_cache_miss),
 			}, "\n")
 
 			vim.notify(msg, vim.log.levels.INFO, { title = "dashboard stats" })
@@ -106,6 +110,86 @@ return {
 		-- 单 buffer 复用
 		local dashboard_buf = nil
 		local ns_dashboard = api.nvim_create_namespace("StartupDashboard")
+
+		-----------------------------------------------------
+		-- 轻量工具函数
+		-----------------------------------------------------
+		local function is_local_path(path)
+			return not path:match("^%w[%w+.-]*://")
+		end
+
+		local function is_on_windows_mount(path)
+			return path:match("^/mnt/[a-zA-Z]/")
+		end
+
+		-----------------------------------------------------
+		-- to_abs 缓存（减少 fnamemodify(:p)）
+		-----------------------------------------------------
+		local abs_cache = {}
+
+		-- fast-path：已是绝对路径（类 Unix），且不包含 .. / . 这样的需要归一化的段
+		local function looks_abs_clean(p)
+			return type(p) == "string"
+				and p:sub(1, 1) == "/"
+				and not p:find("/%./")
+				and not p:find("/%.%./")
+				and not p:find("//")
+		end
+
+		local function to_abs(path)
+			if not path or path == "" then
+				return ""
+			end
+
+			local cached = abs_cache[path]
+			if cached ~= nil then
+				stats.abs_cache_hit = stats.abs_cache_hit + 1
+				return cached
+			end
+
+			stats.abs_cache_miss = stats.abs_cache_miss + 1
+
+			-- 尽量避免 fnamemodify 开销：对“看起来已干净的绝对路径”直接用
+			local abs
+			if looks_abs_clean(path) then
+				abs = path
+			else
+				abs = fn.fnamemodify(path, ":p")
+			end
+
+			abs = abs or ""
+			abs_cache[path] = abs
+			return abs
+		end
+
+		-----------------------------------------------------
+		-- root_prefix 缓存（减少 display_path_for_root 的重复计算）
+		-----------------------------------------------------
+		local root_prefix_cache = {}
+
+		local function root_prefix(root_key)
+			if root_key == "OTHER" or not root_key or root_key == "" then
+				return nil
+			end
+
+			local cached = root_prefix_cache[root_key]
+			if cached ~= nil then
+				return cached or nil
+			end
+
+			local abs = to_abs(root_key)
+			if abs == "" then
+				root_prefix_cache[root_key] = false
+				return nil
+			end
+
+			if not abs:match("/$") then
+				abs = abs .. "/"
+			end
+
+			root_prefix_cache[root_key] = abs
+			return abs
+		end
 
 		-----------------------------------------------------
 		-- devicons
@@ -157,17 +241,6 @@ return {
 		api.nvim_create_autocmd("ColorScheme", { callback = setup_hl })
 
 		-----------------------------------------------------
-		-- 轻量工具函数
-		-----------------------------------------------------
-		local function is_local_path(path)
-			return not path:match("^%w[%w+.-]*://")
-		end
-
-		local function is_on_windows_mount(path)
-			return path:match("^/mnt/[a-zA-Z]/")
-		end
-
-		-----------------------------------------------------
 		-- icon 缓存
 		-----------------------------------------------------
 		local icon_cache = {}
@@ -212,7 +285,7 @@ return {
 				return nil
 			end
 
-			local abspath = fn.fnamemodify(path, ":p")
+			local abspath = to_abs(path)
 			if abspath == "" then
 				stats.git_root_ms_total = stats.git_root_ms_total + (now_ms() - t0)
 				return nil
@@ -310,6 +383,12 @@ return {
 				oldfiles_cache_all = nil
 				preheat_scheduled = false
 				stats.oldfiles_sig_changes = stats.oldfiles_sig_changes + 1
+
+				-- 保险：oldfiles 变化时同步清理路径相关缓存，避免长期增长
+				abs_cache = {}
+				root_prefix_cache = {}
+
+				dbg("oldfiles changed: caches invalidated")
 			end
 		end
 
@@ -337,6 +416,7 @@ return {
 				end
 
 				if is_local_path(fname) and not is_on_windows_mount(fname) and fn.filereadable(fname) == 1 then
+					-- 注意：这里保持原始 fname，后续统一 to_abs
 					table.insert(result, fname)
 				end
 			end
@@ -400,7 +480,6 @@ return {
 					return
 				end
 
-				-- 构建全量缓存
 				local ok = pcall(function()
 					get_valid_oldfiles_cached(true)
 				end)
@@ -408,7 +487,6 @@ return {
 					return
 				end
 
-				-- A) 可选：预热 git root（分批）
 				preheat_git_roots_batch(oldfiles_cache_all)
 				dbg(
 					("preheat done: all_oldfiles=%d, preheat_git_root=%s"):format(
@@ -423,7 +501,7 @@ return {
 		-- 显示路径：相对当前分组 root（OTHER 退化）
 		-----------------------------------------------------
 		local function display_path_for_root(root_key, fname)
-			local abs = fn.fnamemodify(fname, ":p")
+			local abs = to_abs(fname)
 			if abs == "" then
 				return fn.fnamemodify(fname, ":~:.")
 			end
@@ -432,16 +510,13 @@ return {
 				return fn.fnamemodify(abs, ":~:.")
 			end
 
-			local root_abs = fn.fnamemodify(root_key, ":p")
-			if root_abs == "" then
+			local prefix = root_prefix(root_key)
+			if not prefix then
 				return fn.fnamemodify(abs, ":~:.")
 			end
-			if not root_abs:match("/$") then
-				root_abs = root_abs .. "/"
-			end
 
-			if abs:sub(1, #root_abs) == root_abs then
-				local rel = abs:sub(#root_abs + 1)
+			if abs:sub(1, #prefix) == prefix then
+				local rel = abs:sub(#prefix + 1)
 				return rel ~= "" and rel or "."
 			end
 
@@ -456,22 +531,19 @@ return {
 			local order = {}
 			local per_root_count = {}
 
-			local expanded_abs_prefix = nil
+			local expanded_prefix = nil
 			if expanded_root and expanded_root ~= "OTHER" then
-				local expanded_abs = fn.fnamemodify(expanded_root, ":p")
-				if expanded_abs ~= "" then
-					expanded_abs_prefix = expanded_abs:match("/$") and expanded_abs or (expanded_abs .. "/")
-				end
+				expanded_prefix = root_prefix(expanded_root)
 			end
 
 			for _, fname in ipairs(files) do
-				local abspath = fn.fnamemodify(fname, ":p")
+				local abspath = to_abs(fname)
 				if abspath == "" then
 					goto continue
 				end
 
 				local key
-				if expanded_abs_prefix and abspath:sub(1, #expanded_abs_prefix) == expanded_abs_prefix then
+				if expanded_prefix and abspath:sub(1, #expanded_prefix) == expanded_prefix then
 					key = expanded_root
 					file_root_cache[abspath] = expanded_root
 				else
@@ -499,12 +571,13 @@ return {
 				::continue::
 			end
 
+			-- 置顶：使用启动时 cwd（避免 cd 造成顺序抖动）
 			local cwd_root = find_git_root(startup_cwd)
 			if cwd_root then
-				local cwd_root_abs = fn.fnamemodify(cwd_root, ":p")
+				local cwd_root_abs = to_abs(cwd_root)
 				local matched
 				for _, k in ipairs(order) do
-					if k ~= "OTHER" and fn.fnamemodify(k, ":p") == cwd_root_abs then
+					if k ~= "OTHER" and to_abs(k) == cwd_root_abs then
 						matched = k
 						break
 					end
@@ -551,11 +624,11 @@ return {
 			end
 
 			if prefer_path then
-				local prefer_abs = fn.fnamemodify(prefer_path, ":p")
+				local prefer_abs = to_abs(prefer_path)
 				for _, g in ipairs(groups) do
 					if g.key == root then
 						for _, e in ipairs(g.files) do
-							if fn.fnamemodify(e.raw, ":p") == prefer_abs then
+							if to_abs(e.raw) == prefer_abs then
 								api.nvim_win_set_cursor(win, { e.lnum, e.ps or 0 })
 								return
 							end
@@ -579,7 +652,12 @@ return {
 			if not path or path == "" or not is_local_path(path) then
 				return
 			end
-			local abspath = fn.fnamemodify(path, ":p")
+
+			local abspath = to_abs(path)
+			if abspath == "" then
+				return
+			end
+
 			local dir = fn.fnamemodify(abspath, ":h")
 			if dir == "" or fn.isdirectory(dir) == 0 then
 				vim.cmd.edit(fn.fnameescape(abspath))
@@ -746,7 +824,6 @@ return {
 			table.insert(lines, "  " .. string.rep("─", math.min(vim.o.columns - 4, 50)))
 			table.insert(lines, "")
 
-			-- 未展开：只扫100；展开：全量（并缓存）
 			local valid_files = get_valid_oldfiles_cached(expanded_root ~= nil)
 			local grouped, order = group_files_by_root(valid_files)
 
@@ -830,6 +907,7 @@ return {
 			end
 			api.nvim_buf_set_var(buf, "startup_entries", entries)
 
+			-- 高亮
 			for i = 0, #HEADER - 1 do
 				api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesHeader", i, 0, -1)
 			end
@@ -864,6 +942,7 @@ return {
 				end
 			end
 
+			-- 光标恢复
 			if pending_cursor ~= nil then
 				restore_cursor_to_root(0, groups, pending_cursor.root, pending_cursor.path)
 				pending_cursor = nil
@@ -876,7 +955,7 @@ return {
 				end
 			end
 
-			-- 未展开时触发后台预热（全量 oldfiles + 可选 git root）
+			-- 未展开时触发后台预热
 			if expanded_root == nil then
 				schedule_preheat_all_oldfiles()
 			end
@@ -893,7 +972,6 @@ return {
 			render()
 		end, { desc = "Open startup dashboard" })
 
-		-- C) stats & debug toggle
 		api.nvim_create_user_command("DashboardStats", function()
 			print_stats()
 		end, { desc = "Show dashboard profiling stats" })
