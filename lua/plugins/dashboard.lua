@@ -1,11 +1,3 @@
--- 自定义简单 dashboard，用「最近项目（按 git 仓库分组）」作为启动页
--- 功能概要：
---   - 最多显示 10 个 git 仓库（项目）
---   - 每个仓库最多显示 5 个最近文件
---   - 数字 1-9/0 跳转到对应仓库，不自动打开文件
---   - j / k 在所有文件行里循环移动（跨仓库）
---   - <CR> 在当前行打开对应文件（会自动 cd 到 git root）
---   - Esc / q 关闭 dashboard
 return {
 	name = "dashboard",
 	dir = vim.fn.stdpath("config"),
@@ -13,7 +5,6 @@ return {
 	priority = 1000,
 
 	config = function()
-		-- 常用 API 缩写
 		local api = vim.api
 		local fn = vim.fn
 		local uv = vim.loop
@@ -21,24 +12,33 @@ return {
 		-----------------------------------------------------
 		-- 用户配置项
 		-----------------------------------------------------
-		local USE_ICONS = true -- 是否启用文件类型图标（依赖 nvim-web-devicons）
-		local MAX_ROOTS = 10 -- 最多显示多少个 git 仓库
-		local PER_ROOT_FILES = 5 -- 每个仓库展示的最大文件数
-		local MAX_OLDFILES_SCAN = 100 -- 最高只扫描最近 300 条 oldfiles，加速启动
+		local USE_ICONS = true
+		local MAX_ROOTS = 10
+		local PER_ROOT_FILES = 5
+		local MAX_OLDFILES_SCAN = 100
 
 		-----------------------------------------------------
-		-- 颜色 & 高亮定义
+		-- 状态
 		-----------------------------------------------------
-		-- 用于缓存「没有 git 仓库」的标记，避免频繁向上爬目录
-		local NO_GIT_ROOT = false
+		local expanded_root = nil -- nil / "OTHER" / "/abs/git/root"
+		local pending_cursor = nil -- { root=..., path=/abs/file or nil }
+		local startup_cwd = fn.getcwd()
 
-		-- 只有启用图标才去 require devicons，避免无意义的 require 开销
+		-- 单 buffer 复用
+		local dashboard_buf = nil
+		local ns_dashboard = api.nvim_create_namespace("StartupDashboard")
+
+		-----------------------------------------------------
+		-- devicons
+		-----------------------------------------------------
 		local has_devicons, devicons = false, nil
 		if USE_ICONS then
 			has_devicons, devicons = pcall(require, "nvim-web-devicons")
 		end
 
-		-- 优先尝试从 tokyonight 里取一套颜色，失败则用兜底颜色
+		-----------------------------------------------------
+		-- colors & highlight
+		-----------------------------------------------------
 		local ok_colors, tn_colors = pcall(function()
 			return require("tokyonight.colors").setup()
 		end)
@@ -52,7 +52,6 @@ return {
 				comment = "#5c6370",
 			}
 
-		-- 顶部 ASCII 标题
 		local HEADER = {
 			[[    _   _   _                 _           _           _   _                          _                ]],
 			[[   | \ | | (_)   ___  __  __ (_)  _ __   ( )  ___    | \ | |   ___    ___   __   __ (_)  _ __ ___     ]],
@@ -61,17 +60,14 @@ return {
 			[[   |_| \_| |_|  \___| /_/\_\ |_| |_| |_|     |___/   |_| \_|  \___|  \___/    \_/   |_| |_| |_| |_|   ]],
 		}
 
-		-----------------------------------------------------
-		-- 高亮组：统一定义 + ColorScheme 时自动重建
-		-----------------------------------------------------
 		local function setup_hl()
 			local hl = {
-				OldfilesHeader = { fg = colors.magenta, bold = true }, -- 顶部大标题
-				OldfilesSection = { fg = colors.blue, bold = true }, -- 小节标题（Recent projects / 仓库名）
-				OldfilesIndex = { fg = colors.orange, bold = true }, -- [1] [2] 这样的索引
-				OldfilesPath = { fg = colors.comment, italic = true }, -- 路径部分
-				OldfilesFilename = { fg = colors.cyan, bold = true }, -- 文件名部分
-				OldfilesHint = { fg = colors.comment, italic = true }, -- 底部操作提示
+				OldfilesHeader = { fg = colors.magenta, bold = true },
+				OldfilesSection = { fg = colors.blue, bold = true },
+				OldfilesIndex = { fg = colors.orange, bold = true },
+				OldfilesPath = { fg = colors.comment, italic = true },
+				OldfilesFilename = { fg = colors.cyan, bold = true },
+				OldfilesHint = { fg = colors.comment, italic = true },
 			}
 			for k, v in pairs(hl) do
 				api.nvim_set_hl(0, k, v)
@@ -79,77 +75,56 @@ return {
 		end
 
 		setup_hl()
-		api.nvim_create_autocmd("ColorScheme", {
-			callback = setup_hl,
-		})
+		api.nvim_create_autocmd("ColorScheme", { callback = setup_hl })
 
 		-----------------------------------------------------
-		-- 图标缓存：避免反复调用 devicons.get_icon
-		-----------------------------------------------------
-		local icon_cache = {}
-
-		--- 获取文件图标（带缓存）
-		---@param fname string 文件路径
-		---@return string icon, string|nil hl_group
-		local function get_icon_cached(fname)
-			-- 全局关闭图标，直接返回空
-			if not USE_ICONS then
-				return "", nil
-			end
-
-			-- devicons 不存在 / require 失败 / 没有 get_icon 方法
-			if not has_devicons or type(devicons) ~= "table" or type(devicons.get_icon) ~= "function" then
-				return "", nil
-			end
-
-			-- 已缓存
-			if icon_cache[fname] then
-				return icon_cache[fname].icon, icon_cache[fname].hl
-			end
-
-			local ext = fn.fnamemodify(fname, ":e")
-			local icon, hl = devicons.get_icon(fname, ext, { default = true })
-
-			icon = icon or ""
-			hl = hl or nil
-
-			icon_cache[fname] = { icon = icon, hl = hl }
-
-			return icon, hl
-		end
-
-		-----------------------------------------------------
-		-- 工具函数：判断是否本地路径（排除诸如 scheme:// 的 URI）
+		-- 轻量工具函数
 		-----------------------------------------------------
 		local function is_local_path(path)
 			return not path:match("^%w[%w+.-]*://")
 		end
 
-		-----------------------------------------------------
-		-- 工具函数：判断是否是 Windows 挂载盘（/mnt/c,/mnt/d,...）
-		-- 仅用于 dashboard 过滤，避免无意义扫描 Windows 盘
-		-----------------------------------------------------
 		local function is_on_windows_mount(path)
-			-- 典型形式：/mnt/c/Users/... /mnt/d/... /mnt/e/...
 			return path:match("^/mnt/[a-zA-Z]/")
 		end
 
 		-----------------------------------------------------
-		-- 查找 git 仓库根目录（带负缓存）
-		-- 从给定 path 一路向上找 .git 目录 / 文件
+		-- icon 缓存
 		-----------------------------------------------------
-		local git_root_cache = {}
-
-		--- 查找 path 所在 git 仓库根目录
-		---@param path string 文件或目录路径
-		---@return string|nil git_root
-		local function find_git_root(path)
-			if not is_local_path(path) then
-				return nil
+		local icon_cache = {}
+		local function get_icon_cached(fname)
+			if not USE_ICONS then
+				return "", nil
+			end
+			if not has_devicons or type(devicons) ~= "table" or type(devicons.get_icon) ~= "function" then
+				return "", nil
 			end
 
-			-- ★ 如果是 /mnt/*，直接返回 nil，避免去 Windows 盘爬 .git
-			if is_on_windows_mount(path) then
+			local c = icon_cache[fname]
+			if c then
+				return c.icon, c.hl
+			end
+
+			local ext = fn.fnamemodify(fname, ":e")
+			local icon, hl = devicons.get_icon(fname, ext, { default = true })
+			icon = icon or ""
+			hl = hl or nil
+			icon_cache[fname] = { icon = icon, hl = hl }
+			return icon, hl
+		end
+
+		-----------------------------------------------------
+		-- git root：目录缓存 + 文件缓存（关键性能提升）
+		-----------------------------------------------------
+		local NO_GIT_ROOT = false
+		local git_root_cache = {} -- dir -> root|NO_GIT_ROOT
+		local file_root_cache = {} -- file(abs) -> root|false
+
+		local function find_git_root(path)
+			if not path or path == "" then
+				return nil
+			end
+			if not is_local_path(path) or is_on_windows_mount(path) then
 				return nil
 			end
 
@@ -158,27 +133,29 @@ return {
 				return nil
 			end
 
-			-- 如果是文件，则取所在目录
-			local dir = fn.isdirectory(abspath) == 1 and abspath or fn.fnamemodify(abspath, ":h")
+			local cached_file = file_root_cache[abspath]
+			if cached_file ~= nil then
+				return cached_file or nil
+			end
+
+			local dir = (fn.isdirectory(abspath) == 1) and abspath or fn.fnamemodify(abspath, ":h")
 			if dir == "" then
+				file_root_cache[abspath] = false
 				return nil
 			end
 
-			local visited = {} -- 记录向上爬时经过的目录，用于批量写缓存
-			local root = nil
+			local visited = {}
 			local cur = dir
+			local root = nil
 
 			while cur and cur ~= "" do
-				-- 如果当前目录已经有缓存，直接使用
-				local cached = git_root_cache[cur]
-				if cached ~= nil then
-					root = cached ~= NO_GIT_ROOT and cached or nil
+				local cached_dir = git_root_cache[cur]
+				if cached_dir ~= nil then
+					root = cached_dir ~= NO_GIT_ROOT and cached_dir or nil
 					break
 				end
 
 				table.insert(visited, cur)
-
-				-- cur/.git 存在即可视为 git 仓库
 				if uv.fs_stat(cur .. "/.git") then
 					root = cur
 					break
@@ -186,7 +163,6 @@ return {
 
 				local parent = fn.fnamemodify(cur, ":h")
 				if parent == cur then
-					-- 已经到根目录
 					break
 				end
 				cur = parent
@@ -197,106 +173,184 @@ return {
 				git_root_cache[d] = cache_value
 			end
 
+			file_root_cache[abspath] = root or false
 			return root
 		end
 
 		-----------------------------------------------------
-		-- 打开文件：自动 cd 到 git root，然后 :edit 该文件
+		-- oldfiles 全量缓存策略 + 后台预热
 		-----------------------------------------------------
-		local function open_oldfile(path)
-			if not path or path == "" or not is_local_path(path) then
-				return
+		local oldfiles_cache_top = nil
+		local oldfiles_cache_all = nil
+		local oldfiles_sig_cached = nil
+
+		-- 预热调度状态
+		local preheat_scheduled = false
+
+		local function oldfiles_signature(list)
+			if type(list) ~= "table" then
+				return "nil"
+			end
+			local n = #list
+			if n == 0 then
+				return "0"
 			end
 
-			local abspath = fn.fnamemodify(path, ":p")
-			local dir = fn.fnamemodify(abspath, ":h")
-
-			-- 父目录不存在时，直接尝试 edit 绝对路径
-			if dir == "" or fn.isdirectory(dir) == 0 then
-				vim.cmd.edit(fn.fnameescape(abspath))
-				return
+			local function at(i)
+				local v = list[i]
+				return v or ""
 			end
 
-			local root = find_git_root(path)
-			local target_dir = root or dir
-
-			-- 先 cd 到仓库根目录，再打开文件
-			vim.cmd("cd " .. fn.fnameescape(target_dir))
-			vim.cmd.edit(fn.fnameescape(abspath))
+			local mid = math.floor(n / 2)
+			return table.concat({
+				tostring(n),
+				at(1),
+				at(2),
+				at(3),
+				at(mid),
+				at(n - 2),
+				at(n - 1),
+				at(n),
+			}, "\n")
 		end
 
-		-----------------------------------------------------
-		-- 将一行中的路径，拆分出「路径部分 + 文件名部分」的高亮范围
-		-- full_line: 整行文本
-		-- path_start: 路径（含 /）在行内的起始列
-		-- 返回：path_start, filename_start, filename_end
-		-----------------------------------------------------
-		local function split_ranges(full_line, path_start)
-			-- 匹配最后一个 / 或 \ 后面的部分作为文件名
-			local m = fn.matchstrpos(full_line, [[\v[^/\\]+$]])
-			local fname_s, fname_e = m[2], m[3]
-			if fname_s < 0 then
-				return path_start, nil, nil
+		local function invalidate_oldfiles_cache_if_needed()
+			local sig = oldfiles_signature(vim.v.oldfiles or {})
+			if sig ~= oldfiles_sig_cached then
+				oldfiles_sig_cached = sig
+				oldfiles_cache_top = nil
+				oldfiles_cache_all = nil
+				-- oldfiles 变化后，允许重新预热
+				preheat_scheduled = false
 			end
-			return path_start, fname_s, fname_e
 		end
 
-		-----------------------------------------------------
-		-- 从 vim.v.oldfiles 中筛选有效文件：
-		--   - 只扫描前 MAX_OLDFILES_SCAN 条（性能优化）
-		--   - 过滤掉不可读或非本地路径
-		--   - 过滤掉位于 /mnt/* 的 Windows 挂载盘文件
-		-----------------------------------------------------
-		local function get_valid_oldfiles()
+		local function get_valid_oldfiles_cached(scan_all)
+			invalidate_oldfiles_cache_if_needed()
+
+			if scan_all then
+				if oldfiles_cache_all ~= nil then
+					return oldfiles_cache_all
+				end
+			else
+				if oldfiles_cache_top ~= nil then
+					return oldfiles_cache_top
+				end
+			end
+
 			local result = {}
 			local count = 0
 
 			for _, fname in ipairs(vim.v.oldfiles or {}) do
 				count = count + 1
-
-				-- 性能优化：限制最多扫描多少条 oldfiles
-				if count > MAX_OLDFILES_SCAN then
+				if (not scan_all) and count > MAX_OLDFILES_SCAN then
 					break
 				end
 
-				if
-					is_local_path(fname)
-					and not is_on_windows_mount(fname) -- ★ 新增：过滤 /mnt/*
-					and fn.filereadable(fname) == 1
-				then
+				if is_local_path(fname) and not is_on_windows_mount(fname) and fn.filereadable(fname) == 1 then
 					table.insert(result, fname)
 				end
+			end
+
+			if scan_all then
+				oldfiles_cache_all = result
+			else
+				oldfiles_cache_top = result
 			end
 
 			return result
 		end
 
-		-----------------------------------------------------
-		-- 按 git root 分组：
-		--   - 最多 max_roots 个仓库
-		--   - 每个仓库最多 per_root_limit 个文件
-		--   - 当前 cwd 所在仓库优先排第一个
-		--
-		-- 返回：
-		--   grouped: { [root_key] = { file1, file2, ... } }
-		--   order  : { root_key1, root_key2, ... }（分组展示顺序）
-		-----------------------------------------------------
-		local function group_files_by_root(files, max_roots, per_root_limit)
-			max_roots = max_roots or MAX_ROOTS
-			per_root_limit = per_root_limit or PER_ROOT_FILES
+		-- 后台预热：首次进入 dashboard 后，延迟构建全量缓存
+		local function schedule_preheat_all_oldfiles()
+			invalidate_oldfiles_cache_if_needed()
 
+			-- 已有全量缓存 or 已调度，则不重复
+			if oldfiles_cache_all ~= nil or preheat_scheduled then
+				return
+			end
+
+			preheat_scheduled = true
+			vim.schedule(function()
+				-- 执行前再次检查是否需要失效
+				invalidate_oldfiles_cache_if_needed()
+
+				-- 如果此时已经有缓存（例如用户先展开过），直接跳过
+				if oldfiles_cache_all ~= nil then
+					return
+				end
+
+				-- 构建全量缓存（这一步是“挪到空闲时做”）
+				pcall(function()
+					get_valid_oldfiles_cached(true)
+				end)
+			end)
+		end
+
+		-----------------------------------------------------
+		-- 显示路径：相对当前分组 root（OTHER 退化）
+		-----------------------------------------------------
+		local function display_path_for_root(root_key, fname)
+			local abs = fn.fnamemodify(fname, ":p")
+			if abs == "" then
+				return fn.fnamemodify(fname, ":~:.")
+			end
+
+			if root_key == "OTHER" then
+				return fn.fnamemodify(abs, ":~:.")
+			end
+
+			local root_abs = fn.fnamemodify(root_key, ":p")
+			if root_abs == "" then
+				return fn.fnamemodify(abs, ":~:.")
+			end
+			if not root_abs:match("/$") then
+				root_abs = root_abs .. "/"
+			end
+
+			if abs:sub(1, #root_abs) == root_abs then
+				local rel = abs:sub(#root_abs + 1)
+				return rel ~= "" and rel or "."
+			end
+
+			return fn.fnamemodify(abs, ":~:.")
+		end
+
+		-----------------------------------------------------
+		-- 分组：展开 root 全量、其它 root 5 条；并对展开 root 做前缀快路径
+		-----------------------------------------------------
+		local function group_files_by_root(files)
 			local grouped = {}
 			local order = {}
-			local per_root_count = {} -- 每个 root 已加入多少文件
+			local per_root_count = {}
+
+			local expanded_abs_prefix = nil
+			if expanded_root and expanded_root ~= "OTHER" then
+				local expanded_abs = fn.fnamemodify(expanded_root, ":p")
+				if expanded_abs ~= "" then
+					expanded_abs_prefix = expanded_abs:match("/$") and expanded_abs or (expanded_abs .. "/")
+				end
+			end
 
 			for _, fname in ipairs(files) do
-				local root = find_git_root(fname)
-				local key = root or "OTHER" -- OTHER 代表没有 git 仓库
+				local abspath = fn.fnamemodify(fname, ":p")
+				if abspath == "" then
+					goto continue
+				end
 
-				-- 尚未出现过的仓库，需要检查是否已达上限
+				local key
+				if expanded_abs_prefix and abspath:sub(1, #expanded_abs_prefix) == expanded_abs_prefix then
+					key = expanded_root
+					file_root_cache[abspath] = expanded_root
+				else
+					local root = find_git_root(abspath)
+					key = root or "OTHER"
+				end
+
 				if not grouped[key] then
-					if #order >= max_roots then
-						-- 仓库数量到达上限，直接跳过该文件
+					local reached = (#order >= MAX_ROOTS)
+					local must_keep = (expanded_root ~= nil and key == expanded_root)
+					if reached and not must_keep then
 						goto continue
 					end
 					grouped[key] = {}
@@ -304,35 +358,30 @@ return {
 					table.insert(order, key)
 				end
 
-				-- 仓库内文件数未到上限才加入
-				if per_root_count[key] < per_root_limit then
-					table.insert(grouped[key], fname)
+				local limit = (expanded_root ~= nil and key == expanded_root) and math.huge or PER_ROOT_FILES
+				if per_root_count[key] < limit then
+					table.insert(grouped[key], abspath)
 					per_root_count[key] = per_root_count[key] + 1
 				end
 
 				::continue::
 			end
 
-			-- 将「当前工作目录所在仓库」移动到 order 第一个
-			local cwd = fn.getcwd()
-			local cwd_root = find_git_root(cwd)
-
+			local cwd_root = find_git_root(startup_cwd)
 			if cwd_root then
 				local cwd_root_abs = fn.fnamemodify(cwd_root, ":p")
-				local matched_key = nil
-
-				for _, key in ipairs(order) do
-					if key ~= "OTHER" and fn.fnamemodify(key, ":p") == cwd_root_abs then
-						matched_key = key
+				local matched
+				for _, k in ipairs(order) do
+					if k ~= "OTHER" and fn.fnamemodify(k, ":p") == cwd_root_abs then
+						matched = k
 						break
 					end
 				end
-
-				if matched_key then
-					local new_order = { matched_key }
-					for _, key in ipairs(order) do
-						if key ~= matched_key then
-							table.insert(new_order, key)
+				if matched then
+					local new_order = { matched }
+					for _, k in ipairs(order) do
+						if k ~= matched then
+							table.insert(new_order, k)
 						end
 					end
 					order = new_order
@@ -343,23 +392,88 @@ return {
 		end
 
 		-----------------------------------------------------
-		-- j / k：在「所有仓库的所有文件」中循环移动
-		--   - entries 是一个扁平数组：{ {lnum=行号, ps=起始列, raw=路径}, ... }
-		--   - delta = +1：向下；delta = -1：向上
-		--   - 不在文件行上时，自动跳到第一个 / 最后一个文件
+		-- 光标辅助
+		-----------------------------------------------------
+		local function get_current_file_under_cursor()
+			if not dashboard_buf or not api.nvim_buf_is_valid(dashboard_buf) then
+				return nil
+			end
+			local cur_line = api.nvim_win_get_cursor(0)[1]
+			local ok_g, cur_groups = pcall(api.nvim_buf_get_var, dashboard_buf, "startup_groups")
+			if not ok_g or not cur_groups then
+				return nil
+			end
+			for _, g in ipairs(cur_groups) do
+				for _, e in ipairs(g.files) do
+					if e.lnum == cur_line then
+						return e.raw
+					end
+				end
+			end
+			return nil
+		end
+
+		local function restore_cursor_to_root(win, groups, root, prefer_path)
+			if not root or not groups then
+				return
+			end
+
+			if prefer_path then
+				local prefer_abs = fn.fnamemodify(prefer_path, ":p")
+				for _, g in ipairs(groups) do
+					if g.key == root then
+						for _, e in ipairs(g.files) do
+							if fn.fnamemodify(e.raw, ":p") == prefer_abs then
+								api.nvim_win_set_cursor(win, { e.lnum, e.ps or 0 })
+								return
+							end
+						end
+					end
+				end
+			end
+
+			for _, g in ipairs(groups) do
+				if g.key == root and #g.files > 0 then
+					api.nvim_win_set_cursor(win, { g.files[1].lnum, g.files[1].ps or 0 })
+					return
+				end
+			end
+		end
+
+		-----------------------------------------------------
+		-- 打开文件：cd 到 root 再 edit
+		-----------------------------------------------------
+		local function open_oldfile(path)
+			if not path or path == "" or not is_local_path(path) then
+				return
+			end
+			local abspath = fn.fnamemodify(path, ":p")
+			local dir = fn.fnamemodify(abspath, ":h")
+			if dir == "" or fn.isdirectory(dir) == 0 then
+				vim.cmd.edit(fn.fnameescape(abspath))
+				return
+			end
+
+			local root = find_git_root(abspath)
+			local target_dir = root or dir
+			vim.cmd("cd " .. fn.fnameescape(target_dir))
+			vim.cmd.edit(fn.fnameescape(abspath))
+		end
+
+		-----------------------------------------------------
+		-- j/k 循环移动（跨仓库）
 		-----------------------------------------------------
 		local function move_delta(delta)
-			local win = api.nvim_get_current_win()
-			local buf = api.nvim_win_get_buf(win)
+			if not dashboard_buf or not api.nvim_buf_is_valid(dashboard_buf) then
+				return
+			end
 
-			local ok, entries = pcall(api.nvim_buf_get_var, buf, "startup_entries")
+			local ok, entries = pcall(api.nvim_buf_get_var, dashboard_buf, "startup_entries")
 			if not ok or not entries or #entries == 0 then
 				return
 			end
 
-			local cur_line = api.nvim_win_get_cursor(win)[1]
-
-			-- 查找当前光标所在文件索引
+			local cur_line = api.nvim_win_get_cursor(0)[1]
 			local cur_idx
 			for i, e in ipairs(entries) do
 				if e.lnum == cur_line then
@@ -369,11 +483,6 @@ return {
 			end
 
 			local total = #entries
-			if total == 0 then
-				return
-			end
-
-			-- 当前不在任何文件行：根据方向跳到第一个 / 最后一个文件
 			if not cur_idx then
 				cur_idx = (delta > 0) and 1 or total
 			else
@@ -385,44 +494,130 @@ return {
 			end
 
 			local e = entries[cur_idx]
-			local col = e.ps or 0
-			api.nvim_win_set_cursor(win, { e.lnum, col })
+			api.nvim_win_set_cursor(0, { e.lnum, e.ps or 0 })
 		end
 
 		-----------------------------------------------------
-		-- 主渲染函数：
-		--   - 创建临时 buffer / window
-		--   - 渲染标题、项目列表、提示
-		--   - 建立高亮 & keymap
+		-- Buffer 初始化（只做一次）
+		-----------------------------------------------------
+		local function ensure_dashboard_buf()
+			if dashboard_buf and api.nvim_buf_is_valid(dashboard_buf) then
+				return dashboard_buf
+			end
+
+			dashboard_buf = api.nvim_create_buf(false, true)
+			api.nvim_buf_set_name(dashboard_buf, "dashboard")
+			api.nvim_set_option_value("buftype", "nofile", { buf = dashboard_buf })
+			api.nvim_set_option_value("bufhidden", "wipe", { buf = dashboard_buf })
+			api.nvim_set_option_value("swapfile", false, { buf = dashboard_buf })
+			api.nvim_set_option_value("filetype", "dashboard", { buf = dashboard_buf })
+
+			local function map(lhs, rhs)
+				vim.keymap.set("n", lhs, rhs, { buffer = dashboard_buf, silent = true })
+			end
+
+			for _, k in ipairs({ "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }) do
+				map(k, function()
+					local idx = (k == "0") and 10 or tonumber(k)
+					local ok_g, groups = pcall(api.nvim_buf_get_var, dashboard_buf, "startup_groups")
+					if not ok_g or not groups then
+						return
+					end
+					local g = groups[idx]
+					if not g then
+						return
+					end
+
+					local cur_path = get_current_file_under_cursor()
+					pending_cursor = { root = g.key, path = cur_path }
+
+					if expanded_root == g.key then
+						expanded_root = nil
+						vim.cmd("Dashboard")
+						return
+					end
+
+					expanded_root = g.key
+					if g.key ~= "OTHER" then
+						vim.cmd("cd " .. fn.fnameescape(g.key))
+					end
+					vim.cmd("Dashboard")
+				end)
+			end
+
+			map("<CR>", function()
+				local cur_line = api.nvim_win_get_cursor(0)[1]
+				local ok_g, groups = pcall(api.nvim_buf_get_var, dashboard_buf, "startup_groups")
+				if not ok_g or not groups then
+					return
+				end
+				for _, g in ipairs(groups) do
+					for _, e in ipairs(g.files) do
+						if e.lnum == cur_line then
+							open_oldfile(e.raw)
+							return
+						end
+					end
+				end
+			end)
+
+			map("j", function()
+				move_delta(1)
+			end)
+			map("k", function()
+				move_delta(-1)
+			end)
+
+			for _, k in ipairs({ "<Esc>", "q" }) do
+				map(k, "<cmd>bd!<cr>")
+			end
+
+			local function map_pass(key)
+				map(key, function()
+					local seq = ((vim.v.count > 0) and tostring(vim.v.count) or "") .. key
+					vim.cmd("bd!")
+					local term = api.nvim_replace_termcodes(seq, true, false, true)
+					api.nvim_feedkeys(term, "n", false)
+				end)
+			end
+			for _, k in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "c", "C", "r", "R" }) do
+				map_pass(k)
+			end
+
+			return dashboard_buf
+		end
+
+		-----------------------------------------------------
+		-- 主渲染：只更新 buffer 内容
 		-----------------------------------------------------
 		local function render()
-			-- 创建无名 scratch buffer
-			local buf = api.nvim_create_buf(false, true)
-			local win = api.nvim_get_current_win()
-			local lines = {}
+			local buf = ensure_dashboard_buf()
+			api.nvim_win_set_buf(0, buf)
+			api.nvim_buf_clear_namespace(buf, ns_dashboard, 0, -1)
 
-			-- 顶部 HEADER
+			local lines = {}
 			for _, l in ipairs(HEADER) do
 				table.insert(lines, l)
 			end
 			table.insert(lines, "")
-			local header_count = #HEADER
 
-			-- SECTION 标题（Recent projects）
 			local section_lnum = #lines + 1
-			table.insert(lines, "    Recent projects (by git root)")
+			if expanded_root ~= nil then
+				local show = (expanded_root == "OTHER") and "Other files" or fn.fnamemodify(expanded_root, ":~:.")
+				table.insert(lines, ("    Recent projects (expanded: %s)"):format(show))
+			else
+				table.insert(lines, "    Recent projects (by git root)")
+			end
 			table.insert(lines, "  " .. string.rep("─", math.min(vim.o.columns - 4, 50)))
 			table.insert(lines, "")
 
-			-- 取 oldfiles 并按 git root 分组
-			local valid_files = get_valid_oldfiles()
-			local grouped, order = group_files_by_root(valid_files, MAX_ROOTS, PER_ROOT_FILES)
+			-- 未展开：只扫100；展开：全量（并缓存）
+			local valid_files = get_valid_oldfiles_cached(expanded_root ~= nil)
+			local grouped, order = group_files_by_root(valid_files)
 
-			local groups = {} -- 保存每个仓库的元数据（header 行号、文件列表等）
-			local ns = api.nvim_create_namespace("StartupDashboard")
+			local groups = {}
 			local group_header_lnums = {}
-
-			local group_index = 0 -- 仓库编号（1~10，对应数字键）
+			local group_index = 0
 
 			for _, root_key in ipairs(order) do
 				local files = grouped[root_key]
@@ -431,12 +626,14 @@ return {
 					local label = (group_index == 10) and "0" or tostring(group_index)
 
 					local root_name = (root_key == "OTHER") and "Other files" or fn.fnamemodify(root_key, ":~:.")
-
-					-- 仓库标题行，形如：
-					--   [1]    ~/proj/foo
-					local title = string.format("  [%s]    %s", label, root_name)
+					local title
 					if root_key == "OTHER" then
 						title = string.format("  [%s]    %s", label, root_name)
+					else
+						title = string.format("  [%s]    %s", label, root_name)
+					end
+					if expanded_root ~= nil and root_key == expanded_root then
+						title = title .. "  (expanded)"
 					end
 
 					local group_lnum = #lines + 1
@@ -444,114 +641,52 @@ return {
 					table.insert(group_header_lnums, group_lnum)
 
 					local group = {
-						key = root_key, -- git root 路径或 "OTHER"
-						index = group_index, -- 仓库编号，用于数字键跳转
+						key = root_key,
+						index = group_index,
 						header_lnum = group_lnum,
-						files = {}, -- 该仓库下的文件 entry 列表
+						files = {},
 					}
 
-					-- 仓库内文件行
-					for _, fname in ipairs(files) do
-						local path = fn.fnamemodify(fname, ":~:.")
-						local icon, icon_hl = get_icon_cached(fname)
-						local prefix = "      " -- 文件行缩进（与 header 区分）
+					for _, abspath in ipairs(files) do
+						local path = display_path_for_root(root_key, abspath)
+						local icon, icon_hl = get_icon_cached(abspath)
+
+						local prefix = "      "
 						local icon_part = (USE_ICONS and icon ~= "") and (icon .. " ") or ""
 						local full_line = prefix .. icon_part .. path
-
 						table.insert(lines, full_line)
 
 						local lnum = #lines
-						local path_start = #prefix + #icon_part
-						local ps, pe, fe = split_ranges(full_line, path_start)
-
 						local entry = {
-							lnum = lnum, -- 当前文件行号
-							full = full_line,
-							ps = ps, -- 路径起始列（用于光标定位 / 高亮）
-							pe = pe, -- 文件名起始列
-							fe = fe, -- 文件名结束列
+							lnum = lnum,
+							ps = #prefix + #icon_part,
+							raw = abspath,
 							icon = icon,
-							icon_col = #prefix, -- 图标起始列
+							icon_col = #prefix,
 							icon_hl = icon_hl,
-							raw = fname, -- 原始文件路径
 						}
 						table.insert(group.files, entry)
 					end
 
-					-- 仓库之间加一个空行作为分隔
 					table.insert(lines, "")
-
 					table.insert(groups, group)
 				end
 			end
 
-			-- 没有任何仓库 / 文件时的提示
 			if #groups == 0 then
 				table.insert(lines, "  (no recent git projects)")
 			end
 
-			-- 底部操作提示
 			table.insert(lines, "")
 			local hint_lnum = #lines + 1
-			table.insert(lines, "    [0-9] Jump repo · j/k Move · <CR> Open file · <Esc>/q Close")
+			table.insert(lines, "    [0-9] Expand/Collapse · j/k Move · <CR> Open file · <Esc>/q Close")
 
-			-- 写入 buffer & 基本 buffer 配置
+			api.nvim_set_option_value("modifiable", true, { buf = buf })
 			api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-			api.nvim_win_set_buf(win, buf)
-			api.nvim_buf_set_name(buf, "dashboard")
+			api.nvim_set_option_value("modifiable", false, { buf = buf })
+
 			api.nvim_buf_set_var(buf, "startup_groups", groups)
 
-			api.nvim_set_option_value("buftype", "nofile", { buf = buf })
-			api.nvim_set_option_value("bufhidden", "wipe", { buf = buf })
-			api.nvim_set_option_value("swapfile", false, { buf = buf })
-			api.nvim_set_option_value("modifiable", false, { buf = buf })
-			api.nvim_set_option_value("filetype", "dashboard", { buf = buf })
-
-			-------------------------------------------------
-			-- 高亮：标题 / 小节 / 仓库 header / 文件路径
-			-------------------------------------------------
-			for i = 0, header_count - 1 do
-				api.nvim_buf_add_highlight(buf, -1, "OldfilesHeader", i, 0, -1)
-			end
-			api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", section_lnum - 1, 0, -1)
-			api.nvim_buf_add_highlight(buf, -1, "OldfilesHint", hint_lnum - 1, 0, -1)
-
-			for _, lnum in ipairs(group_header_lnums) do
-				-- 整个仓库标题行
-				api.nvim_buf_add_highlight(buf, -1, "OldfilesSection", lnum - 1, 0, -1)
-				-- 标题中的 [n] 索引
-				api.nvim_buf_add_highlight(buf, -1, "OldfilesIndex", lnum - 1, 2, 5)
-			end
-
-			-- 文件行高亮 + 图标 virt_text
-			for _, g in ipairs(groups) do
-				for _, e in ipairs(g.files) do
-					local l0 = e.lnum - 1
-
-					if not e.pe then
-						-- 没找到文件名边界时，全部视为路径
-						api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", l0, e.ps, -1)
-					else
-						-- 路径部分
-						api.nvim_buf_add_highlight(buf, -1, "OldfilesPath", l0, e.ps, e.pe)
-						-- 文件名部分
-						api.nvim_buf_add_highlight(buf, -1, "OldfilesFilename", l0, e.pe, e.fe)
-					end
-
-					-- 用 virt_text 覆盖前面打印的文本图标，保持颜色一致
-					if USE_ICONS and e.icon ~= "" and e.icon_hl then
-						api.nvim_buf_set_extmark(buf, ns, l0, e.icon_col, {
-							virt_text = { { e.icon, e.icon_hl } },
-							virt_text_pos = "overlay",
-							virt_text_hide = true,
-						})
-					end
-				end
-			end
-
-			-------------------------------------------------
-			-- 将所有文件 entries 扁平化，供 j/k 使用
-			-------------------------------------------------
 			local entries = {}
 			for _, g in ipairs(groups) do
 				for _, e in ipairs(g.files) do
@@ -560,115 +695,69 @@ return {
 			end
 			api.nvim_buf_set_var(buf, "startup_entries", entries)
 
-			-------------------------------------------------
-			-- 初始光标位置：第一个仓库的第一个文件
-			-------------------------------------------------
-			for _, g in ipairs(groups) do
-				if #g.files > 0 then
-					local e = g.files[1]
-					local col = e.ps or 0
-					api.nvim_win_set_cursor(win, { e.lnum, col })
-					break
-				end
+			for i = 0, #HEADER - 1 do
+				api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesHeader", i, 0, -1)
+			end
+			api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesSection", section_lnum - 1, 0, -1)
+			api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesHint", hint_lnum - 1, 0, -1)
+
+			for _, lnum in ipairs(group_header_lnums) do
+				api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesSection", lnum - 1, 0, -1)
+				api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesIndex", lnum - 1, 2, 5)
 			end
 
-			-------------------------------------------------
-			-- 数字键 1-9,0：跳转到对应仓库（不打开文件）
-			--   - 若仓库有文件：跳到该仓库第一个文件
-			--   - 若仓库无文件：跳到仓库标题行
-			-------------------------------------------------
 			for _, g in ipairs(groups) do
-				local idx = g.index
-				local key = (idx == 10) and "0" or tostring(idx)
-				if #g.files > 0 then
-					local first = g.files[1]
-					vim.keymap.set("n", key, function()
-						local col = first.ps or 0
-						api.nvim_win_set_cursor(0, { first.lnum, col })
-					end, { buffer = buf, silent = true })
-				else
-					vim.keymap.set("n", key, function()
-						api.nvim_win_set_cursor(0, { g.header_lnum, 0 })
-					end, { buffer = buf, silent = true })
-				end
-			end
+				for _, e in ipairs(g.files) do
+					local l0 = e.lnum - 1
+					local line = lines[e.lnum]
+					local last_slash = line:match(".*()/")
 
-			-------------------------------------------------
-			-- <CR>：在当前文件行上打开文件
-			--   - 若光标在 header/空行上，则不做任何事
-			-------------------------------------------------
-			vim.keymap.set("n", "<CR>", function()
-				local cur_line = api.nvim_win_get_cursor(0)[1]
-				local ok_g, cur_groups = pcall(api.nvim_buf_get_var, 0, "startup_groups")
-				if not ok_g or not cur_groups then
-					return
-				end
+					if last_slash and last_slash >= e.ps then
+						api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesPath", l0, e.ps, last_slash)
+						api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesFilename", l0, last_slash, -1)
+					else
+						api.nvim_buf_add_highlight(buf, ns_dashboard, "OldfilesFilename", l0, e.ps, -1)
+					end
 
-				for _, g in ipairs(cur_groups) do
-					for _, e in ipairs(g.files) do
-						if e.lnum == cur_line then
-							open_oldfile(e.raw)
-							return
-						end
+					if USE_ICONS and e.icon ~= "" and e.icon_hl then
+						api.nvim_buf_set_extmark(buf, ns_dashboard, l0, e.icon_col, {
+							virt_text = { { e.icon, e.icon_hl } },
+							virt_text_pos = "overlay",
+							virt_text_hide = true,
+						})
 					end
 				end
-			end, { buffer = buf, silent = true })
-
-			-------------------------------------------------
-			-- j / k：在所有文件行中循环移动（跨仓库）
-			-------------------------------------------------
-			vim.keymap.set("n", "j", function()
-				move_delta(1)
-			end, { buffer = buf, silent = true })
-
-			vim.keymap.set("n", "k", function()
-				move_delta(-1)
-			end, { buffer = buf, silent = true })
-
-			-------------------------------------------------
-			-- 关闭 dashboard：<Esc> 或 q
-			-------------------------------------------------
-			for _, key in ipairs({ "<Esc>", "q" }) do
-				vim.keymap.set("n", key, "<cmd>bd!<cr>", { buffer = buf, silent = true })
 			end
 
-			-------------------------------------------------
-			-- 透传 i / a / o / s / c / r 等按键：
-			--   - 关闭 dashboard
-			--   - 在原窗口中重新发送相同按键（带 count）
-			--   - 用于保持 muscle memory（如进插入模式）
-			-------------------------------------------------
-			local function map_pass(key)
-				vim.keymap.set("n", key, function()
-					local seq = ((vim.v.count > 0) and tostring(vim.v.count) or "") .. key
-					vim.cmd("bd!") -- 先关掉 dashboard buffer
-					local term = api.nvim_replace_termcodes(seq, true, false, true)
-					api.nvim_feedkeys(term, "n", false)
-				end, { buffer = buf, silent = true })
+			if pending_cursor ~= nil then
+				restore_cursor_to_root(0, groups, pending_cursor.root, pending_cursor.path)
+				pending_cursor = nil
+			else
+				for _, g in ipairs(groups) do
+					if #g.files > 0 then
+						api.nvim_win_set_cursor(0, { g.files[1].lnum, g.files[1].ps or 0 })
+						break
+					end
+				end
 			end
 
-			for _, key in ipairs({ "i", "I", "a", "A", "o", "O", "s", "S", "c", "C", "r", "R" }) do
-				map_pass(key)
+			-- ★ 未展开时触发“后台预热全量 oldfiles”
+			if expanded_root == nil then
+				schedule_preheat_all_oldfiles()
 			end
 		end
 
 		-----------------------------------------------------
-		-- 用户命令：手动打开 dashboard
-		--   :Dashboard  像启动时一样，在当前窗口打开 dashboard
+		-- 用户命令
 		-----------------------------------------------------
 		api.nvim_create_user_command("Dashboard", function()
 			render()
-		end, {
-			desc = "Open custom startup dashboard",
-		})
+		end, { desc = "Open startup dashboard" })
 
-		-- 可选：给个全局快捷键
-		vim.keymap.set("n", "<leader>fd", "<cmd>Dashboard<CR>", {
-			desc = "Open startup dashboard",
-		})
+		vim.keymap.set("n", "<leader>fd", "<cmd>Dashboard<CR>", { desc = "Open startup dashboard" })
+
 		-----------------------------------------------------
-		-- 自动在 VimEnter 时显示 dashboard：
-		--   - 仅在「不带参数启动」且「当前 buffer 为空」时生效
+		-- 自动在 UIEnter 显示
 		-----------------------------------------------------
 		api.nvim_create_autocmd("UIEnter", {
 			once = true,
