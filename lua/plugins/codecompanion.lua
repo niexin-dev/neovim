@@ -23,13 +23,13 @@ return {
 		-- 定义不同策略使用的适配器
 		strategies = {
 			chat = { -- 聊天模式
-				adapter = "ollama",
+				adapter = "gemini_cli",
 			},
 			inline = { -- 行内编辑模式
-				adapter = "ollama",
+				adapter = "gemini_cli",
 			},
 			cmd = { -- 命令行模式
-				adapter = "ollama",
+				adapter = "gemini_cli",
 			},
 		},
 		-- 适配器具体配置
@@ -80,6 +80,18 @@ return {
 							model = {
 								default = "qwen3-coder:30b", -- 默认模型
 							},
+							num_ctx = {
+								default = 32768,
+							},
+						},
+					})
+				end,
+			},
+			acp = {
+				gemini_cli = function()
+					return require("codecompanion.adapters").extend("gemini_cli", {
+						defaults = {
+							auth_method = "oauth-personal", -- 使用 gemini-cli OAuth
 						},
 					})
 				end,
