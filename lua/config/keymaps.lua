@@ -61,11 +61,11 @@ vim.keymap.set("n", "<leader>w", "<cmd>w<CR>", { desc = "Save file", silent = tr
 vim.keymap.set("t", "<C-j>", [[<C-\><C-n>]], { noremap = true, silent = true })
 
 ----------------------------------------------------------------------
--- <leader>tn: 创建终端
+-- <leader>fw: 创建终端
 --  - 如果已经有终端窗口：在“最后一个终端”的右边再创建一个终端（vsplit）
 --  - 如果还没有终端窗口：在当前 buffer 下方创建一个终端
 ----------------------------------------------------------------------
-vim.keymap.set("n", "<leader>tn", function()
+vim.keymap.set("n", "<leader>fw", function()
 	local last_term_win = nil
 
 	-- 找到当前所有终端窗口中“最后一个”
@@ -89,12 +89,12 @@ vim.keymap.set("n", "<leader>tn", function()
 end, { noremap = true, silent = true, desc = "New terminal" })
 
 ----------------------------------------------------------------------
--- <leader>ta: 智能 Toggle Terminal（显示/隐藏/新建）
+-- <leader>fa: 智能 Toggle Terminal（显示/隐藏/新建）
 ----------------------------------------------------------------------
 -- 保存“被隐藏终端”的 buffer 列表
 local hidden_term_buffers = {}
 
-vim.keymap.set("n", "<leader>ta", function()
+vim.keymap.set("n", "<leader>fa", function()
 	local term_wins = {} -- 当前显示中的终端窗口
 	local term_bufs = {} -- 当前显示中的终端 buffer
 	local has_term_shown = false

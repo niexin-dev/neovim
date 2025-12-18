@@ -10,7 +10,7 @@ return {
 		-- search
 		{ "<leader>fs", "<cmd>FzfLua live_grep<cr>", desc = "Grep" },
 		{ "<leader>fr", "<cmd>FzfLua grep_cword<cr>", desc = "Grep word" },
-		{ "<leader>fa", "<cmd>FzfLua resume<cr>", desc = "Resuse" },
+		{ "<leader>fj", "<cmd>FzfLua resume<cr>", desc = "Resuse" },
 		{ "<leader>fq", "<cmd>FzfLua oldfiles<cr>", desc = "Old files" },
 		-- git
 		{ "<leader>Gc", "<cmd>FzfLua git_commits<CR>", desc = "Git Commits" },
