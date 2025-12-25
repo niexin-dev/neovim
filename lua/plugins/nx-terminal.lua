@@ -23,7 +23,7 @@ return {
 			end,
 			desc = "Zoom",
 		},
-		{ "<C-j>", [[<C-\><C-n>]], mode = "t", desc = "Terminal escape" },
+		{ "<leader>e", [[<C-\><C-n>]], mode = "t", desc = "Terminal escape" },
 	},
 	config = function()
 		require("nx-terminal").setup()

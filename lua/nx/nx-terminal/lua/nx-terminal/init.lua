@@ -32,7 +32,7 @@ local defaults = {
 	new_term_when_has_term = "vsplit", -- when term exists, create on the right of last term
 	mappings = {
 		-- terminal-mode escape
-		term_escape = { mode = "t", lhs = "<C-j>", rhs = [[<C-\><C-n>]], desc = "Terminal: exit to Normal" },
+		term_escape = { mode = "t", lhs = "<leader>e", rhs = [[<C-\><C-n>]], desc = "Terminal: exit to Normal" },
 
 		-- create a new terminal
 		new_terminal = { mode = "n", lhs = "<leader>fw", desc = "New terminal" },
